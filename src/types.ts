@@ -33,21 +33,10 @@ export interface Score {
   version: string;
 }
 
-export interface ERC8004Identity {
-  chain: string;
-  token_id: number;
-  registry_contract: string | null;
-  name: string | null;
-  description: string | null;
-  metadata_quality: string | null;
-  endpoint_count: number;
-}
-
 export interface Identity {
   ens_name: string | null;
   website_url: string | null;
   github_url: string | null;
-  erc8004: ERC8004Identity | null;
 }
 
 export interface Activity {
@@ -66,6 +55,21 @@ export interface Activity {
   last_verified_tx_at: string | null;
 }
 
+export interface OperatorScore {
+  score: number;
+  grade: Grade;
+  agent_count: number;
+  chains_active: string[];
+}
+
+export interface AgentSummary {
+  token_id: number;
+  chain: string;
+  name: string | null;
+  score: number;
+  grade: Grade;
+}
+
 export interface ReputationResponse {
   subject: Subject;
   classification: Classification;
@@ -76,6 +80,8 @@ export interface ReputationResponse {
   data_semantics: string;
   caveats: string[];
   updated_at: string | null;
+  operator_score?: OperatorScore;
+  agents?: AgentSummary[];
 }
 
 export interface DecisionPolicy {

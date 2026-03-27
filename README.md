@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@agent-score/sdk.svg)](https://www.npmjs.com/package/@agent-score/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-TypeScript/Node.js client for the [AgentScore](https://agentscore.sh) trust and reputation API. Score, verify, and assess AI agent wallets in the [x402](https://github.com/coinbase/x402) payment ecosystem and [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) agent registry.
+TypeScript/Node.js client for the [AgentScore](https://agentscore.sh) trust and reputation API.
 
 ## Install
 
@@ -18,31 +18,36 @@ bun add @agent-score/sdk
 ```typescript
 import { AgentScore } from "@agent-score/sdk";
 
-const client = new AgentScore({ apiKey: "ask_..." });
+const client = new AgentScore({ apiKey: "as_live_..." });
 
-// Free reputation summary
-const summary = await client.getReputation("0x1234...");
-console.log(summary.score, summary.grade);
+// Look up cached reputation (free)
+const rep = await client.getReputation("0x1234...");
+console.log(rep.score.value, rep.score.grade);
 
-// Trust decision with policy
-const result = await client.getDecision("0x1234...", {
-  min_grade: "C",
-  min_transactions: 5,
+// Filter to a specific chain
+const baseRep = await client.getReputation("0x1234...", { chain: "base" });
+console.log(baseRep.agents); // only Base agents
+
+// On-the-fly assessment with policy (paid)
+const result = await client.assess("0x1234...", {
+  policy: { min_grade: "B", min_score: 35 },
 });
-console.log(result.decision.allow, result.decision.reasons);
+console.log(result.decision, result.decision_reasons);
 
-// Batch lookup
-const batch = await client.batchReputation(
-  ["0x1234...", "0x5678..."],
-  { view: "full", policy: { min_grade: "B" } }
-);
+// Browse agents
+const agents = await client.getAgents({ chain: "base", limit: 10 });
+console.log(agents.items.length, agents.count);
+
+// Ecosystem stats
+const stats = await client.getStats();
+console.log(stats.erc8004?.known_agents);
 ```
 
 ## Configuration
 
 | Option    | Type     | Default                     | Description              |
 | --------- | -------- | --------------------------- | ------------------------ |
-| `apiKey`  | `string` | —                           | API key from [agentscore.sh](https://agentscore.sh) |
+| `apiKey`  | `string` | ---                         | API key from [agentscore.sh](https://agentscore.sh) |
 | `baseUrl` | `string` | `https://api.agentscore.sh` | API base URL             |
 | `timeout` | `number` | `10000`                     | Request timeout in ms    |
 
@@ -63,8 +68,6 @@ try {
 ## Documentation
 
 - [API Reference](https://docs.agentscore.sh)
-- [ERC-8004 Standard](https://eips.ethereum.org/EIPS/eip-8004)
-- [x402 Protocol](https://github.com/coinbase/x402)
 
 ## License
 

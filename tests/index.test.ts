@@ -138,12 +138,22 @@ describe('AgentScore.getReputation()', () => {
     );
   });
 
-  it('appends chain query param when provided', async () => {
+  it('does not send chain param when not provided', async () => {
     mockFetchOk(REPUTATION_RESPONSE);
     const client = new AgentScore({ apiKey: API_KEY });
-    await client.getReputation(WALLET, { chain: 'ethereum' });
+    await client.getReputation(WALLET);
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('chain=ethereum'),
+      `https://api.agentscore.sh/v1/reputation/${WALLET}`,
+      expect.anything(),
+    );
+  });
+
+  it('sends chain query param when provided', async () => {
+    mockFetchOk(REPUTATION_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.getReputation(WALLET, { chain: 'base' });
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('chain=base'),
       expect.anything(),
     );
   });
