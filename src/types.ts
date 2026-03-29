@@ -55,6 +55,42 @@ export interface Activity {
   last_verified_tx_at: string | null;
 }
 
+export interface EvidenceSummary {
+  candidate_tx_count?: number;
+  confirmed_or_likely_tx?: number;
+  endpoint_count?: number;
+  github_stars?: number | null;
+  github_url?: string | null;
+  has_a2a_agent_card?: boolean;
+  has_ens?: boolean;
+  has_github?: boolean;
+  has_website?: boolean;
+  healthy_endpoints?: number;
+  is_erc8004?: boolean;
+  metadata_kind?: string | null;
+  metadata_quality?: string | null;
+  multi_chain_count?: number;
+  reputation_feedback_count?: number;
+  reputation_trust_avg?: number | null;
+  reputation_uptime_avg?: number | null;
+  reputation_activity_avg?: number | null;
+  reputation_client_count?: number;
+  verified_tx_count?: number;
+  website_mentions_mcp?: boolean;
+  website_mentions_x402?: boolean;
+  website_reachable?: boolean;
+  website_url?: string | null;
+}
+
+export interface Reputation {
+  feedback_count: number;
+  client_count: number;
+  trust_avg: number | null;
+  uptime_avg: number | null;
+  activity_avg: number | null;
+  last_feedback_at: string | null;
+}
+
 export interface OperatorScore {
   score: number;
   grade: Grade;
@@ -76,10 +112,11 @@ export interface ReputationResponse {
   score: Score;
   identity: Identity | null;
   activity: Activity | null;
-  evidence_summary: Record<string, unknown> | null;
+  evidence_summary: EvidenceSummary | null;
   data_semantics: string;
   caveats: string[];
   updated_at: string | null;
+  reputation?: Reputation;
   operator_score?: OperatorScore;
   agents?: AgentSummary[];
 }
