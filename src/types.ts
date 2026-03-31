@@ -9,7 +9,7 @@ export type EntityType = 'agent' | 'service' | 'hybrid' | 'wallet' | 'bot' | 'un
 export type ReputationStatus = 'unknown' | 'known_unscored' | 'scored' | 'stale' | 'indexing';
 
 export interface Subject {
-  chain: string;
+  chains: string[];
   address: string;
 }
 
@@ -24,12 +24,20 @@ export interface Classification {
 }
 
 export interface Score {
+  value: number | null;
+  grade: Grade | null;
+  scored_at: string | null;
   status: ReputationStatus;
+  version: string;
+}
+
+export interface ChainScore {
   value: number | null;
   grade: Grade | null;
   confidence: number | null;
   dimensions: Record<string, number> | null;
   scored_at: string | null;
+  status: ReputationStatus;
   version: string;
 }
 
@@ -106,13 +114,19 @@ export interface AgentSummary {
   grade: Grade;
 }
 
+export interface ChainEntry {
+  chain: string;
+  score: ChainScore;
+  classification: Classification;
+  identity: Identity;
+  activity: Activity;
+  evidence_summary: EvidenceSummary;
+}
+
 export interface ReputationResponse {
   subject: Subject;
-  classification: Classification;
   score: Score;
-  identity: Identity | null;
-  activity: Activity | null;
-  evidence_summary: EvidenceSummary | null;
+  chains: ChainEntry[];
   data_semantics: string;
   caveats: string[];
   updated_at: string | null;
@@ -134,10 +148,19 @@ export interface AssessRequest {
   policy?: DecisionPolicy;
 }
 
-export interface AssessResponse extends ReputationResponse {
+export interface AssessResponse {
+  subject: Subject;
+  score: Score;
+  chains: ChainEntry[];
   decision: string | null;
   decision_reasons: string[];
   on_the_fly: boolean;
+  data_semantics: string;
+  caveats: string[];
+  updated_at: string | null;
+  operator_score?: OperatorScore;
+  reputation?: Reputation;
+  agents?: AgentSummary[];
 }
 
 export interface AgentRecord {
