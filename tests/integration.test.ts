@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { AgentScore } from '../src/index';
 
 const API_KEY = process.env.AGENTSCORE_API_KEY;
@@ -8,7 +8,11 @@ const TEST_ADDRESS = '0x339559a2d1cd15059365fc7bd36b3047bba480e0';
 const describeIf = API_KEY ? describe : describe.skip;
 
 describeIf('integration: real API', () => {
-  const client = new AgentScore({ apiKey: API_KEY!, baseUrl: BASE_URL });
+  let client: AgentScore;
+
+  beforeAll(() => {
+    client = new AgentScore({ apiKey: API_KEY!, baseUrl: BASE_URL });
+  });
 
   it('getReputation returns correct shape', async () => {
     const rep = await client.getReputation(TEST_ADDRESS);
