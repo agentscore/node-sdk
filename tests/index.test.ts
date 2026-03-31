@@ -25,22 +25,25 @@ function mockFetchError(status: number, errorBody?: { error: { code: string; mes
 }
 
 const REPUTATION_RESPONSE = {
-  subject: { chain: 'base', address: WALLET },
+  subject: { chains: ['base'], address: WALLET },
   score: { value: 85, grade: 'A', status: 'scored' },
-  classification: { entity_type: 'agent', is_known: true },
-  identity: null,
-  activity: null,
-  evidence_summary: null,
+  chains: [{ chain: 'base', score: { value: 85, grade: 'A' }, classification: { entity_type: 'agent' }, identity: {}, activity: {}, evidence_summary: {} }],
   data_semantics: 'v1',
   caveats: [],
   updated_at: '2024-01-01T00:00:00Z',
 };
 
 const ASSESS_RESPONSE = {
-  ...REPUTATION_RESPONSE,
+  subject: { chains: ['base'], address: WALLET },
+  score: { value: 85, grade: 'A', status: 'scored' },
+  chains: [{ chain: 'base', score: { value: 85, grade: 'A' }, classification: { entity_type: 'agent' }, identity: {}, activity: {}, evidence_summary: {} }],
   decision: 'allow',
   decision_reasons: [],
   on_the_fly: false,
+  data_semantics: 'v1',
+  caveats: [],
+  updated_at: '2024-01-01T00:00:00Z',
+  agents: [],
 };
 
 const AGENTS_RESPONSE = {
