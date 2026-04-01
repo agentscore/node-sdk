@@ -7,7 +7,7 @@ const TEST_ADDRESS = '0x339559a2d1cd15059365fc7bd36b3047bba480e0';
 
 const describeIf = API_KEY ? describe : describe.skip;
 
-describeIf('integration: real API', () => {
+describeIf('integration: real API', { timeout: 15_000 }, () => {
   let client: AgentScore;
 
   beforeAll(() => {
@@ -115,6 +115,30 @@ describeIf('integration: real API', () => {
     if (rep.reputation) {
       expect(typeof rep.reputation.feedback_count).toBe('number');
       expect(typeof rep.reputation.client_count).toBe('number');
+    }
+  });
+
+  it('assess then check reputation for same address', async () => {
+    const assessed = await client.assess(TEST_ADDRESS);
+    expect(assessed.score.value).toBeDefined();
+
+    const rep = await client.getReputation(TEST_ADDRESS);
+    expect(rep.score.value).toBeDefined();
+    expect(typeof rep.score.value).toBe('number');
+    expect(rep.subject.address.toLowerCase()).toBe(TEST_ADDRESS.toLowerCase());
+  });
+
+  it('getAgents returns items matching browse results', async () => {
+    const result = await client.getAgents();
+
+    expect(result.items).toBeInstanceOf(Array);
+    expect(result.items.length).toBeGreaterThan(0);
+
+    for (const item of result.items) {
+      expect(item.owner_address).toBeDefined();
+      expect(item.chain).toBeDefined();
+      expect(typeof item.token_id).toBe('number');
+      expect('name' in item).toBe(true);
     }
   });
 });

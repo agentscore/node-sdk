@@ -403,3 +403,119 @@ describe('Timeout and network errors', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Edge Cases
+// ---------------------------------------------------------------------------
+
+describe('Edge cases', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('getReputation encodes special characters in address', async () => {
+    mockFetchOk(REPUTATION_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    const weirdAddress = '0xabc/def?foo=bar&baz=qux#hash';
+    await client.getReputation(weirdAddress);
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const url = call[0] as string;
+    expect(url).toContain(encodeURIComponent(weirdAddress));
+    expect(url).not.toContain('0xabc/def');
+  });
+
+  it('falls back to unknown_error when response.json() throws', async () => {
+    expect.assertions(3);
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      json: vi.fn().mockRejectedValueOnce(new SyntaxError('Unexpected token')),
+    } as unknown as Response);
+
+    const client = new AgentScore({ apiKey: API_KEY });
+    try {
+      await client.getReputation(WALLET);
+    } catch (e) {
+      expect(e).toBeInstanceOf(AgentScoreError);
+      const err = e as AgentScoreError;
+      expect(err.code).toBe('unknown_error');
+      expect(err.status).toBe(502);
+    }
+  });
+
+  it('getAgents omits undefined option values from query params', async () => {
+    mockFetchOk(AGENTS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.getAgents({ chain: 'base', limit: undefined });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const url = call[0] as string;
+    expect(url).toContain('chain=base');
+    expect(url).not.toContain('limit');
+  });
+
+  it('assess sends chain, refresh, and policy all at once', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(WALLET, {
+      chain: 'base',
+      refresh: true,
+      policy: { min_score: 50, require_verified_payment_activity: true },
+    });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.address).toBe(WALLET);
+    expect(body.chain).toBe('base');
+    expect(body.refresh).toBe(true);
+    expect(body.policy).toEqual({ min_score: 50, require_verified_payment_activity: true });
+  });
+
+  it('two concurrent getReputation calls both resolve correctly', async () => {
+    const response2 = { ...REPUTATION_RESPONSE, subject: { chains: ['ethereum'], address: '0xdef456' } };
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValueOnce(REPUTATION_RESPONSE),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValueOnce(response2),
+      } as unknown as Response);
+
+    const client = new AgentScore({ apiKey: API_KEY });
+    const [r1, r2] = await Promise.all([
+      client.getReputation(WALLET),
+      client.getReputation('0xdef456'),
+    ]);
+    expect(r1).toMatchObject(REPUTATION_RESPONSE);
+    expect(r2).toMatchObject(response2);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('getAgents passes through empty items array', async () => {
+    const emptyResponse = { items: [], next_cursor: null, count: 0, version: '1' };
+    mockFetchOk(emptyResponse);
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.getAgents({ chain: 'base' });
+    expect(result.items).toEqual([]);
+    expect(result.count).toBe(0);
+  });
+
+  it('assess includes refresh: false in request body', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(WALLET, { refresh: false });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body).toHaveProperty('refresh');
+    expect(body.refresh).toBe(false);
+  });
+
+  it('getReputation appends chain to query string', async () => {
+    mockFetchOk(REPUTATION_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.getReputation(WALLET, { chain: 'ethereum' });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const url = call[0] as string;
+    expect(url).toBe(`https://api.agentscore.sh/v1/reputation/${WALLET}?chain=ethereum`);
+  });
+});
