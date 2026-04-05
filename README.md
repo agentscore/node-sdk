@@ -33,14 +33,6 @@ const result = await client.assess("0x1234...", {
   policy: { min_grade: "B", min_score: 35 },
 });
 console.log(result.decision, result.decision_reasons);
-
-// Browse agents
-const agents = await client.getAgents({ chain: "base", limit: 10 });
-console.log(agents.items.length, agents.count);
-
-// Ecosystem stats
-const stats = await client.getStats();
-console.log(stats.erc8004?.known_agents);
 ```
 
 ## Configuration

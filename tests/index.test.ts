@@ -27,7 +27,7 @@ function mockFetchError(status: number, errorBody?: { error: { code: string; mes
 const REPUTATION_RESPONSE = {
   subject: { chains: ['base'], address: WALLET },
   score: { value: 85, grade: 'A', status: 'scored' },
-  chains: [{ chain: 'base', score: { value: 85, grade: 'A' }, classification: { entity_type: 'agent' }, identity: {}, activity: {}, evidence_summary: {} }],
+  chains: [{ chain: 'base', score: { value: 85, grade: 'A' }, classification: { entity_type: 'agent' }, identity: {}, activity: {}, evidence_summary: { metadata_kind: null, has_a2a_agent_card: false, website_url: null, website_reachable: false, website_mentions_mcp: false, website_mentions_x402: false, github_url: null, github_stars: null } }],
   data_semantics: 'v1',
   caveats: [],
   updated_at: '2024-01-01T00:00:00Z',
@@ -36,7 +36,7 @@ const REPUTATION_RESPONSE = {
 const ASSESS_RESPONSE = {
   subject: { chains: ['base'], address: WALLET },
   score: { value: 85, grade: 'A', status: 'scored' },
-  chains: [{ chain: 'base', score: { value: 85, grade: 'A' }, classification: { entity_type: 'agent' }, identity: {}, activity: {}, evidence_summary: {} }],
+  chains: [{ chain: 'base', score: { value: 85, grade: 'A' }, classification: { entity_type: 'agent' }, identity: {}, activity: {}, evidence_summary: { metadata_kind: null, has_a2a_agent_card: false, website_url: null, website_reachable: false, website_mentions_mcp: false, website_mentions_x402: false, github_url: null, github_stars: null } }],
   decision: 'allow',
   decision_reasons: [],
   on_the_fly: false,
@@ -44,27 +44,6 @@ const ASSESS_RESPONSE = {
   caveats: [],
   updated_at: '2024-01-01T00:00:00Z',
   agents: [],
-};
-
-const AGENTS_RESPONSE = {
-  items: [],
-  next_cursor: null,
-  count: 0,
-  version: '1',
-};
-
-const STATS_RESPONSE = {
-  version: '1',
-  as_of_time: '2024-01-01T00:00:00Z',
-  data_semantics: 'v1',
-  payments: {
-    addresses_with_candidate_payment_activity: 100,
-    addresses_with_verified_payment_activity: 50,
-    total_candidate_transactions: 1000,
-    total_verified_transactions: 500,
-    verification_status_summary: {},
-  },
-  caveats: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -267,94 +246,6 @@ describe('AgentScore.assess()', () => {
 });
 
 // ---------------------------------------------------------------------------
-// getAgents
-// ---------------------------------------------------------------------------
-
-describe('AgentScore.getAgents()', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('returns agents list on success', async () => {
-    mockFetchOk(AGENTS_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    const result = await client.getAgents();
-    expect(result).toMatchObject(AGENTS_RESPONSE);
-  });
-
-  it('sends GET to /v1/agents', async () => {
-    mockFetchOk(AGENTS_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    await client.getAgents();
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.agentscore.sh/v1/agents',
-      expect.anything(),
-    );
-  });
-
-  it('appends options as query params', async () => {
-    mockFetchOk(AGENTS_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    await client.getAgents({ chain: 'base', limit: 10 });
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('chain=base'),
-      expect.anything(),
-    );
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('limit=10'),
-      expect.anything(),
-    );
-  });
-
-  it('converts boolean filter has_endpoint: true to query param "true"', async () => {
-    mockFetchOk(AGENTS_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    await client.getAgents({ has_endpoint: true });
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('has_endpoint=true'),
-      expect.anything(),
-    );
-  });
-
-  it('converts boolean filter has_endpoint: false to query param "false"', async () => {
-    mockFetchOk(AGENTS_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    await client.getAgents({ has_endpoint: false });
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('has_endpoint=false'),
-      expect.anything(),
-    );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getStats
-// ---------------------------------------------------------------------------
-
-describe('AgentScore.getStats()', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('returns stats data on success', async () => {
-    mockFetchOk(STATS_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    const result = await client.getStats();
-    expect(result).toMatchObject(STATS_RESPONSE);
-  });
-
-  it('sends GET to /v1/stats', async () => {
-    mockFetchOk(STATS_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    await client.getStats();
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.agentscore.sh/v1/stats',
-      expect.anything(),
-    );
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Timeout & Network Errors
 // ---------------------------------------------------------------------------
 
@@ -441,16 +332,6 @@ describe('Edge cases', () => {
     }
   });
 
-  it('getAgents omits undefined option values from query params', async () => {
-    mockFetchOk(AGENTS_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    await client.getAgents({ chain: 'base', limit: undefined });
-    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    const url = call[0] as string;
-    expect(url).toContain('chain=base');
-    expect(url).not.toContain('limit');
-  });
-
   it('assess sends chain, refresh, and policy all at once', async () => {
     mockFetchOk(ASSESS_RESPONSE);
     const client = new AgentScore({ apiKey: API_KEY });
@@ -489,15 +370,6 @@ describe('Edge cases', () => {
     expect(r1).toMatchObject(REPUTATION_RESPONSE);
     expect(r2).toMatchObject(response2);
     expect(global.fetch).toHaveBeenCalledTimes(2);
-  });
-
-  it('getAgents passes through empty items array', async () => {
-    const emptyResponse = { items: [], next_cursor: null, count: 0, version: '1' };
-    mockFetchOk(emptyResponse);
-    const client = new AgentScore({ apiKey: API_KEY });
-    const result = await client.getAgents({ chain: 'base' });
-    expect(result.items).toEqual([]);
-    expect(result.count).toBe(0);
   });
 
   it('assess includes refresh: false in request body', async () => {

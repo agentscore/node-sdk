@@ -128,17 +128,4 @@ describeIf('integration: real API', { timeout: 15_000 }, () => {
     expect(rep.subject.address.toLowerCase()).toBe(TEST_ADDRESS.toLowerCase());
   });
 
-  it('getAgents returns items matching browse results', async () => {
-    const result = await client.getAgents();
-
-    expect(result.items).toBeInstanceOf(Array);
-    expect(result.items.length).toBeGreaterThan(0);
-
-    for (const item of result.items) {
-      expect(item.owner_address).toBeDefined();
-      expect(item.chain).toBeDefined();
-      expect(typeof item.token_id).toBe('number');
-      expect('name' in item).toBe(true);
-    }
-  });
 });
