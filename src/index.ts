@@ -59,7 +59,7 @@ export class AgentScore {
 
     const headers: Record<string, string> = {
       ...(options?.headers as Record<string, string>),
-      Authorization: `Bearer ${this.apiKey}`,
+      'X-API-Key': this.apiKey,
       'User-Agent': `agentscore-sdk/${__VERSION__}`,
     };
 

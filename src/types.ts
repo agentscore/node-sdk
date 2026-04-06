@@ -121,12 +121,27 @@ export interface ReputationResponse {
   reputation?: Reputation;
   operator_score?: OperatorScore;
   agents?: AgentSummary[];
+  verification_level?: VerificationLevel;
+}
+
+export type VerificationLevel = 'none' | 'wallet_claimed' | 'kyc_verified';
+
+export interface OperatorVerification {
+  level: VerificationLevel;
+  operator_type?: string | null;
+  claimed_at?: string | null;
+  verified_at?: string | null;
 }
 
 export interface DecisionPolicy {
   min_grade?: Grade;
   min_score?: number;
   require_verified_payment_activity?: boolean;
+  require_kyc?: boolean;
+  require_sanctions_clear?: boolean;
+  min_age?: number;
+  blocked_jurisdictions?: string[];
+  require_entity_type?: string;
 }
 
 export interface AssessRequest {
@@ -149,6 +164,9 @@ export interface AssessResponse {
   operator_score?: OperatorScore;
   reputation?: Reputation;
   agents?: AgentSummary[];
+  operator_verification?: OperatorVerification;
+  resolved_operator?: string;
+  verify_url?: string;
 }
 
 export interface AgentScoreErrorBody {

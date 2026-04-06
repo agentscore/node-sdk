@@ -115,7 +115,7 @@ describe('AgentScore.getReputation()', () => {
     expect(global.fetch).toHaveBeenCalledWith(
       `https://api.agentscore.sh/v1/reputation/${WALLET}`,
       expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: `Bearer ${API_KEY}` }),
+        headers: expect.objectContaining({ 'X-API-Key': API_KEY }),
       }),
     );
   });
@@ -389,5 +389,166 @@ describe('Edge cases', () => {
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const url = call[0] as string;
     expect(url).toBe(`https://api.agentscore.sh/v1/reputation/${WALLET}?chain=ethereum`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Verification / Compliance types and fields
+// ---------------------------------------------------------------------------
+
+describe('Verification and compliance fields', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('getReputation returns verification_level when present', async () => {
+    const response = {
+      ...REPUTATION_RESPONSE,
+      verification_level: 'kyc_verified' as const,
+    };
+    mockFetchOk(response);
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.getReputation(WALLET);
+    expect(result.verification_level).toBe('kyc_verified');
+  });
+
+  it('getReputation omits verification_level when not present', async () => {
+    mockFetchOk(REPUTATION_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.getReputation(WALLET);
+    expect(result.verification_level).toBeUndefined();
+  });
+
+  it('assess response includes operator_verification when present', async () => {
+    const response = {
+      ...ASSESS_RESPONSE,
+      operator_verification: {
+        level: 'kyc_verified',
+        operator_type: 'business',
+        claimed_at: '2024-06-01T00:00:00Z',
+        verified_at: '2024-06-15T00:00:00Z',
+      },
+    };
+    mockFetchOk(response);
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.assess(WALLET);
+    expect(result.operator_verification).toBeDefined();
+    expect(result.operator_verification!.level).toBe('kyc_verified');
+    expect(result.operator_verification!.operator_type).toBe('business');
+    expect(result.operator_verification!.claimed_at).toBe('2024-06-01T00:00:00Z');
+    expect(result.operator_verification!.verified_at).toBe('2024-06-15T00:00:00Z');
+  });
+
+  it('assess response includes verify_url when present', async () => {
+    const response = {
+      ...ASSESS_RESPONSE,
+      decision: 'deny',
+      decision_reasons: ['kyc_required'],
+      verify_url: 'https://agentscore.sh/verify/abc123',
+    };
+    mockFetchOk(response);
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.assess(WALLET);
+    expect(result.verify_url).toBe('https://agentscore.sh/verify/abc123');
+    expect(result.decision).toBe('deny');
+  });
+
+  it('assess response omits operator_verification and verify_url when not present', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.assess(WALLET);
+    expect(result.operator_verification).toBeUndefined();
+    expect(result.verify_url).toBeUndefined();
+  });
+
+  it('assess sends new compliance policy fields', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(WALLET, {
+      policy: {
+        require_kyc: true,
+        require_sanctions_clear: true,
+        min_age: 90,
+        blocked_jurisdictions: ['KP', 'IR'],
+        require_entity_type: 'agent',
+      },
+    });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    const policy = body.policy as Record<string, unknown>;
+    expect(policy.require_kyc).toBe(true);
+    expect(policy.require_sanctions_clear).toBe(true);
+    expect(policy.min_age).toBe(90);
+    expect(policy.blocked_jurisdictions).toEqual(['KP', 'IR']);
+    expect(policy.require_entity_type).toBe('agent');
+  });
+
+  it('assess sends resolved_operator when present in response', async () => {
+    const response = {
+      ...ASSESS_RESPONSE,
+      resolved_operator: '0xoperator456',
+    };
+    mockFetchOk(response);
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.assess(WALLET);
+    expect(result.resolved_operator).toBe('0xoperator456');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration-style: compliance deny with verify_url
+// ---------------------------------------------------------------------------
+
+describe('Integration: compliance policy deny with verify_url', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('full assess flow returns deny with verify_url for compliance policy', async () => {
+    const complianceDenyResponse = {
+      subject: { chains: ['base'], address: WALLET },
+      score: { value: 72, grade: 'C', status: 'scored' },
+      chains: [{
+        chain: 'base',
+        score: { value: 72, grade: 'C' },
+        classification: { entity_type: 'wallet' },
+        identity: {},
+        activity: {},
+        evidence_summary: { metadata_kind: null, has_a2a_agent_card: false, website_url: null, website_reachable: false, website_mentions_mcp: false, website_mentions_x402: false, github_url: null, github_stars: null },
+      }],
+      decision: 'deny',
+      decision_reasons: ['kyc_required', 'sanctions_check_pending'],
+      on_the_fly: false,
+      data_semantics: 'v1',
+      caveats: [],
+      updated_at: '2024-01-01T00:00:00Z',
+      agents: [],
+      operator_verification: {
+        level: 'none',
+        operator_type: null,
+        claimed_at: null,
+        verified_at: null,
+      },
+      verify_url: 'https://agentscore.sh/verify/xyz789',
+    };
+
+    mockFetchOk(complianceDenyResponse);
+
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.assess(WALLET, {
+      policy: {
+        require_kyc: true,
+        require_sanctions_clear: true,
+      },
+    });
+
+    expect(result.decision).toBe('deny');
+    expect(result.decision_reasons).toContain('kyc_required');
+    expect(result.decision_reasons).toContain('sanctions_check_pending');
+    expect(result.verify_url).toBe('https://agentscore.sh/verify/xyz789');
+    expect(result.operator_verification).toBeDefined();
+    expect(result.operator_verification!.level).toBe('none');
+
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    const policy = body.policy as Record<string, unknown>;
+    expect(policy.require_kyc).toBe(true);
+    expect(policy.require_sanctions_clear).toBe(true);
   });
 });
