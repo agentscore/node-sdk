@@ -33,6 +33,24 @@ const result = await client.assess("0x1234...", {
   policy: { min_grade: "B", min_score: 35 },
 });
 console.log(result.decision, result.decision_reasons);
+
+// Compliance assessment with verification policy
+const gated = await client.assess("0x1234...", {
+  policy: {
+    require_kyc: true,
+    require_sanctions_clear: true,
+    min_age: 21,
+  },
+});
+
+if (gated.decision === "deny") {
+  console.log(gated.decision_reasons); // ["kyc_required"]
+  console.log(gated.verify_url);       // URL for operator verification
+}
+
+// Check verification level on reputation
+const verified = await client.getReputation("0x1234...");
+console.log(verified.verification_level); // "none" | "wallet_claimed" | "kyc_verified"
 ```
 
 ## Configuration
