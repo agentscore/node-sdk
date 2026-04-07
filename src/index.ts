@@ -2,13 +2,10 @@ import { AgentScoreError } from './errors';
 import type {
   AgentScoreConfig,
   AgentScoreErrorBody,
-  AgentsListResponse,
   AssessOptions,
   AssessResponse,
-  GetAgentsOptions,
   GetReputationOptions,
   ReputationResponse,
-  StatsResponse,
 } from './types';
 
 export { AgentScoreError } from './errors';
@@ -57,27 +54,12 @@ export class AgentScore {
     });
   }
 
-  async getAgents(options?: GetAgentsOptions): Promise<AgentsListResponse> {
-    const params = new URLSearchParams();
-    if (options) {
-      for (const [key, value] of Object.entries(options)) {
-        if (value !== undefined) params.set(key, String(value));
-      }
-    }
-    const qs = params.toString();
-    return this.request<AgentsListResponse>(`/v1/agents${qs ? `?${qs}` : ''}`);
-  }
-
-  async getStats(): Promise<StatsResponse> {
-    return this.request<StatsResponse>('/v1/stats');
-  }
-
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
     const url = `${this.baseUrl}${path}`;
 
     const headers: Record<string, string> = {
       ...(options?.headers as Record<string, string>),
-      Authorization: `Bearer ${this.apiKey}`,
+      'X-API-Key': this.apiKey,
       'User-Agent': `agentscore-sdk/${__VERSION__}`,
     };
 

@@ -34,13 +34,23 @@ const result = await client.assess("0x1234...", {
 });
 console.log(result.decision, result.decision_reasons);
 
-// Browse agents
-const agents = await client.getAgents({ chain: "base", limit: 10 });
-console.log(agents.items.length, agents.count);
+// Compliance assessment with verification policy
+const gated = await client.assess("0x1234...", {
+  policy: {
+    require_kyc: true,
+    require_sanctions_clear: true,
+    min_age: 21,
+  },
+});
 
-// Ecosystem stats
-const stats = await client.getStats();
-console.log(stats.erc8004?.known_agents);
+if (gated.decision === "deny") {
+  console.log(gated.decision_reasons); // ["kyc_required"]
+  console.log(gated.verify_url);       // URL for operator verification
+}
+
+// Check verification level on reputation
+const verified = await client.getReputation("0x1234...");
+console.log(verified.verification_level); // "none" | "wallet_claimed" | "kyc_verified"
 ```
 
 ## Configuration

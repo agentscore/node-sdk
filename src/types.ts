@@ -6,7 +6,7 @@ export interface AgentScoreConfig {
 
 export type Grade = 'A' | 'B' | 'C' | 'D' | 'F';
 export type EntityType = 'agent' | 'service' | 'hybrid' | 'wallet' | 'bot' | 'unknown';
-export type ReputationStatus = 'unknown' | 'known_unscored' | 'scored' | 'stale' | 'indexing';
+export type ReputationStatus = 'scored' | 'stale' | 'known_unscored';
 
 export interface Subject {
   chains: string[];
@@ -34,8 +34,8 @@ export interface Score {
 export interface ChainScore {
   value: number | null;
   grade: Grade | null;
-  confidence: number | null;
-  dimensions: Record<string, number> | null;
+  confidence?: number | null;
+  dimensions?: Record<string, number> | null;
   scored_at: string | null;
   status: ReputationStatus;
   version: string;
@@ -64,30 +64,14 @@ export interface Activity {
 }
 
 export interface EvidenceSummary {
-  candidate_tx_count?: number;
-  confirmed_or_likely_tx?: number;
-  endpoint_count?: number;
-  github_stars?: number | null;
-  github_url?: string | null;
-  has_a2a_agent_card?: boolean;
-  has_ens?: boolean;
-  has_github?: boolean;
-  has_website?: boolean;
-  healthy_endpoints?: number;
-  is_erc8004?: boolean;
-  metadata_kind?: string | null;
-  metadata_quality?: string | null;
-  multi_chain_count?: number;
-  reputation_feedback_count?: number;
-  reputation_trust_avg?: number | null;
-  reputation_uptime_avg?: number | null;
-  reputation_activity_avg?: number | null;
-  reputation_client_count?: number;
-  verified_tx_count?: number;
-  website_mentions_mcp?: boolean;
-  website_mentions_x402?: boolean;
-  website_reachable?: boolean;
-  website_url?: string | null;
+  metadata_kind: string | null;
+  has_a2a_agent_card: boolean;
+  website_url: string | null;
+  website_reachable: boolean;
+  website_mentions_mcp: boolean;
+  website_mentions_x402: boolean;
+  github_url: string | null;
+  github_stars: number | null;
 }
 
 export interface Reputation {
@@ -102,8 +86,8 @@ export interface Reputation {
 export interface OperatorScore {
   score: number;
   grade: Grade;
-  agent_count: number;
-  chains_active: string[];
+  agent_count?: number;
+  chains_active?: string[];
 }
 
 export interface AgentSummary {
@@ -114,13 +98,17 @@ export interface AgentSummary {
   grade: Grade;
 }
 
+export interface RedactedClassification {
+  entity_type: EntityType;
+}
+
 export interface ChainEntry {
   chain: string;
   score: ChainScore;
-  classification: Classification;
-  identity: Identity;
-  activity: Activity;
-  evidence_summary: EvidenceSummary;
+  classification: Classification | RedactedClassification;
+  identity?: Identity;
+  activity?: Activity;
+  evidence_summary?: EvidenceSummary;
 }
 
 export interface ReputationResponse {
@@ -133,12 +121,27 @@ export interface ReputationResponse {
   reputation?: Reputation;
   operator_score?: OperatorScore;
   agents?: AgentSummary[];
+  verification_level?: VerificationLevel;
+}
+
+export type VerificationLevel = 'none' | 'wallet_claimed' | 'kyc_verified';
+
+export interface OperatorVerification {
+  level: VerificationLevel;
+  operator_type?: string | null;
+  claimed_at?: string | null;
+  verified_at?: string | null;
 }
 
 export interface DecisionPolicy {
   min_grade?: Grade;
   min_score?: number;
   require_verified_payment_activity?: boolean;
+  require_kyc?: boolean;
+  require_sanctions_clear?: boolean;
+  min_age?: number;
+  blocked_jurisdictions?: string[];
+  require_entity_type?: string;
 }
 
 export interface AssessRequest {
@@ -161,60 +164,9 @@ export interface AssessResponse {
   operator_score?: OperatorScore;
   reputation?: Reputation;
   agents?: AgentSummary[];
-}
-
-export interface AgentRecord {
-  chain: string;
-  token_id: number;
-  owner_address: string;
-  agent_wallet: string | null;
-  name: string | null;
-  description: string | null;
-  metadata_quality: string;
-  score: number | null;
-  grade: Grade | null;
-  entity_type: EntityType | null;
-  endpoint_count: number;
-  website_url: string | null;
-  github_url: string | null;
-  has_candidate_payment_activity: boolean;
-  has_verified_payment_activity: boolean;
-  agents_sharing_owner?: number;
-  updated_at: string;
-}
-
-export interface AgentsListResponse {
-  items: AgentRecord[];
-  next_cursor: string | null;
-  count: number;
-  version: string;
-}
-
-export interface StatsPayments {
-  addresses_with_candidate_payment_activity: number;
-  addresses_with_verified_payment_activity: number;
-  total_candidate_transactions: number;
-  total_verified_transactions: number;
-  verification_status_summary: Record<string, number>;
-}
-
-export interface StatsResponse {
-  version: string;
-  as_of_time: string;
-  data_semantics: string;
-  erc8004?: {
-    known_agents: number;
-    by_chain: Record<string, number>;
-    metadata_quality_distribution: Record<string, number>;
-  };
-  reputation?: {
-    total_addresses: number;
-    scored_addresses: number;
-    entity_distribution: Record<string, number>;
-    score_distribution: Record<string, number>;
-  };
-  payments: StatsPayments;
-  caveats: string[];
+  operator_verification?: OperatorVerification;
+  resolved_operator?: string;
+  verify_url?: string;
 }
 
 export interface AgentScoreErrorBody {
@@ -223,20 +175,6 @@ export interface AgentScoreErrorBody {
     message: string;
     [key: string]: unknown;
   };
-}
-
-export interface GetAgentsOptions {
-  chain?: string;
-  limit?: number;
-  offset?: number;
-  cursor?: string;
-  metadata_quality?: string;
-  grade?: Grade;
-  min_score?: number;
-  has_endpoint?: boolean;
-  entity_type?: EntityType;
-  has_candidate_payment_activity?: boolean;
-  has_verified_payment_activity?: boolean;
 }
 
 export interface GetReputationOptions {
