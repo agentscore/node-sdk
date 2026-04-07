@@ -5,7 +5,7 @@ export interface AgentScoreConfig {
 }
 
 export type Grade = 'A' | 'B' | 'C' | 'D' | 'F';
-export type EntityType = 'agent' | 'service' | 'hybrid' | 'wallet' | 'bot' | 'unknown';
+export type EntityType = 'agent' | 'service' | 'hybrid' | 'wallet' | 'bot' | 'unknown' | 'individual' | 'entity';
 export type ReputationStatus = 'scored' | 'stale' | 'known_unscored';
 
 export interface Subject {
@@ -167,6 +167,15 @@ export interface AssessResponse {
   operator_verification?: OperatorVerification;
   resolved_operator?: string;
   verify_url?: string;
+  policy_result?: {
+    all_passed: boolean;
+    checks: Array<{
+      rule: string;
+      passed: boolean;
+      required?: unknown;
+      actual?: unknown;
+    }>;
+  } | null;
 }
 
 export interface AgentScoreErrorBody {
