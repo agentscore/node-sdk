@@ -605,4 +605,43 @@ describe('AgentScore.assess() — operatorToken', () => {
     expect(body.address).toBeUndefined();
     expect((body.policy as Record<string, unknown>).min_score).toBe(50);
   });
+
+  it('retries on 429 with Retry-After header', async () => {
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'retry-after': '0' }),
+        json: vi.fn().mockResolvedValueOnce({}),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValueOnce(REPUTATION_RESPONSE),
+      } as unknown as Response);
+
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.getReputation(WALLET);
+    expect(result.score.grade).toBe('A');
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws after 429 retry fails', async () => {
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'retry-after': '0' }),
+        json: vi.fn().mockResolvedValueOnce({}),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        json: vi.fn().mockResolvedValueOnce({}),
+      } as unknown as Response);
+
+    const client = new AgentScore({ apiKey: API_KEY });
+    await expect(client.getReputation(WALLET)).rejects.toThrow(AgentScoreError);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
 });
