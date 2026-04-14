@@ -129,7 +129,6 @@ export type VerificationLevel = 'none' | 'wallet_claimed' | 'kyc_verified';
 export interface OperatorVerification {
   level: VerificationLevel;
   operator_type?: string | null;
-  claimed_at?: string | null;
   verified_at?: string | null;
 }
 
@@ -150,7 +149,6 @@ export interface AssessRequest {
 }
 
 export interface AssessResponse {
-  subject: { address?: string; credential_prefix?: string };
   decision: string | null;
   decision_reasons: string[];
   identity_method: 'wallet' | 'operator_token';
