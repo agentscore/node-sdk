@@ -28,13 +28,7 @@ console.log(rep.score.value, rep.score.grade);
 const baseRep = await client.getReputation("0x1234...", { chain: "base" });
 console.log(baseRep.agents); // only Base agents
 
-// On-the-fly assessment with policy (paid)
-const result = await client.assess("0x1234...", {
-  policy: { min_grade: "B", min_score: 35 },
-});
-console.log(result.decision, result.decision_reasons);
-
-// Compliance assessment with verification policy
+// Identity gate with policy (paid)
 const gated = await client.assess("0x1234...", {
   policy: {
     require_kyc: true,
@@ -51,6 +45,44 @@ if (gated.decision === "deny") {
 // Check verification level on reputation
 const verified = await client.getReputation("0x1234...");
 console.log(verified.verification_level); // "none" | "wallet_claimed" | "kyc_verified"
+```
+
+### Credential-Based Identity
+
+Agents without wallets can use operator credentials for identity:
+
+```typescript
+// Assess with an operator credential instead of a wallet address
+const result = await client.assess(null, { operatorToken: "opc_..." });
+console.log(result.decision); // "allow" | "deny"
+```
+
+### Verification Sessions
+
+Bootstrap identity for first-time agents:
+
+```typescript
+// Create a session — returns a URL for the user to verify
+const session = await client.createSession();
+console.log(session.verify_url, session.poll_secret);
+
+// Poll until the user completes verification
+const status = await client.pollSession(session.session_id, session.poll_secret);
+if (status.status === "verified") {
+  console.log(status.operator_token); // "opc_..." — use for future requests
+}
+```
+
+### Credential Management
+
+```typescript
+const cred = await client.createCredential({ label: "my-agent", ttl_days: 7 });
+console.log(cred.credential); // shown once
+
+const list = await client.listCredentials();
+console.log(list); // active, non-expired credentials
+
+await client.revokeCredential(cred.id);
 ```
 
 ## Configuration

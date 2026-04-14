@@ -134,13 +134,11 @@ export interface OperatorVerification {
 }
 
 export interface DecisionPolicy {
-  min_grade?: Grade;
-  min_score?: number;
-  require_verified_payment_activity?: boolean;
   require_kyc?: boolean;
   require_sanctions_clear?: boolean;
   min_age?: number;
   blocked_jurisdictions?: string[];
+  allowed_jurisdictions?: string[];
   require_entity_type?: string;
 }
 
@@ -152,20 +150,12 @@ export interface AssessRequest {
 }
 
 export interface AssessResponse {
-  subject: Subject;
-  score: Score;
-  chains: ChainEntry[];
+  subject: { address?: string; credential_prefix?: string };
   decision: string | null;
   decision_reasons: string[];
-  on_the_fly: boolean;
-  data_semantics: string;
-  caveats: string[];
-  updated_at: string | null;
-  operator_score?: OperatorScore;
-  reputation?: Reputation;
-  agents?: AgentSummary[];
+  identity_method: 'wallet' | 'operator_token';
   operator_verification?: OperatorVerification;
-  resolved_operator?: string;
+  resolved_operator?: string | null;
   verify_url?: string;
   policy_result?: {
     all_passed: boolean;
@@ -176,6 +166,8 @@ export interface AssessResponse {
       actual?: unknown;
     }>;
   } | null;
+  on_the_fly: boolean;
+  updated_at: string | null;
 }
 
 export interface AgentScoreErrorBody {
@@ -194,4 +186,57 @@ export interface AssessOptions {
   chain?: string;
   refresh?: boolean;
   policy?: DecisionPolicy;
+  operatorToken?: string;
+}
+
+export interface SessionCreateOptions {
+  context?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface SessionCreateResponse {
+  session_id: string;
+  poll_secret: string;
+  verify_url: string;
+  poll_url: string;
+  expires_at: string;
+}
+
+export interface SessionPollResponse {
+  session_id: string;
+  status: string;
+  operator_token?: string;
+  completed_at?: string;
+}
+
+export interface CredentialCreateOptions {
+  label?: string;
+  ttl_days?: number;
+}
+
+export interface CredentialCreateResponse {
+  id: string;
+  credential: string;
+  prefix: string;
+  label: string;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface CredentialListItem {
+  id: string;
+  prefix: string;
+  label: string;
+  expires_at: string;
+  last_used_at: string | null;
+  created_at: string;
+}
+
+export interface CredentialListResponse {
+  credentials: CredentialListItem[];
+}
+
+export interface CredentialRevokeResponse {
+  id: string;
+  revoked: true;
 }

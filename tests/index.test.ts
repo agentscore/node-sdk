@@ -205,10 +205,10 @@ describe('AgentScore.assess()', () => {
   it('includes policy in request body when provided', async () => {
     mockFetchOk(ASSESS_RESPONSE);
     const client = new AgentScore({ apiKey: API_KEY });
-    await client.assess(WALLET, { policy: { min_grade: 'B' } });
+    await client.assess(WALLET, { policy: { require_kyc: true } });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
-    expect(body.policy).toEqual({ min_grade: 'B' });
+    expect(body.policy).toEqual({ require_kyc: true });
   });
 
   it('includes chain in request body when provided', async () => {
@@ -550,5 +550,59 @@ describe('Integration: compliance policy deny with verify_url', () => {
     const policy = body.policy as Record<string, unknown>;
     expect(policy.require_kyc).toBe(true);
     expect(policy.require_sanctions_clear).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Identity model: operatorToken in assess
+// ---------------------------------------------------------------------------
+
+describe('AgentScore.assess() — operatorToken', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('sends operator_token when operatorToken option provided without address', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(null, { operatorToken: 'opc_test_123' });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.operator_token).toBe('opc_test_123');
+    expect(body.address).toBeUndefined();
+  });
+
+  it('sends both address and operator_token when both provided', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(WALLET, { operatorToken: 'opc_both_456' });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.address).toBe(WALLET);
+    expect(body.operator_token).toBe('opc_both_456');
+  });
+
+  it('sends only address when no operatorToken (backwards compat)', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(WALLET);
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.address).toBe(WALLET);
+    expect(body.operator_token).toBeUndefined();
+  });
+
+  it('sends operator_token with policy and chain combined', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(null, {
+      operatorToken: 'opc_full',
+      chain: 'base',
+      policy: { min_score: 50 },
+    });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.operator_token).toBe('opc_full');
+    expect(body.chain).toBe('base');
+    expect(body.address).toBeUndefined();
+    expect((body.policy as Record<string, unknown>).min_score).toBe(50);
   });
 });
