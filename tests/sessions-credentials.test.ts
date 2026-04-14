@@ -82,23 +82,48 @@ describe('AgentScore.createSession()', () => {
     expect(body.context).toBe('payment-flow');
   });
 
-  it('includes metadata in request body when provided', async () => {
+  it('includes return_url in request body when provided', async () => {
     mockFetchOk(SESSION_CREATE_RESPONSE);
     const client = new AgentScore({ apiKey: API_KEY });
-    await client.createSession({ metadata: { foo: 'bar', count: 42 } });
+    await client.createSession({ return_url: 'https://example.com/callback' });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
-    expect(body.metadata).toEqual({ foo: 'bar', count: 42 });
+    expect(body.return_url).toBe('https://example.com/callback');
   });
 
-  it('includes both context and metadata when provided', async () => {
+  it('includes payment_methods in request body when provided', async () => {
     mockFetchOk(SESSION_CREATE_RESPONSE);
     const client = new AgentScore({ apiKey: API_KEY });
-    await client.createSession({ context: 'onboarding', metadata: { step: 1 } });
+    await client.createSession({ payment_methods: ['stripe', 'tempo'] });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.payment_methods).toEqual(['stripe', 'tempo']);
+  });
+
+  it('includes product_name in request body when provided', async () => {
+    mockFetchOk(SESSION_CREATE_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.createSession({ product_name: 'Premium Plan' });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.product_name).toBe('Premium Plan');
+  });
+
+  it('includes all first-class fields when provided', async () => {
+    mockFetchOk(SESSION_CREATE_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.createSession({
+      context: 'onboarding',
+      return_url: 'https://example.com/done',
+      payment_methods: ['stripe'],
+      product_name: 'Starter',
+    });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
     expect(body.context).toBe('onboarding');
-    expect(body.metadata).toEqual({ step: 1 });
+    expect(body.return_url).toBe('https://example.com/done');
+    expect(body.payment_methods).toEqual(['stripe']);
+    expect(body.product_name).toBe('Starter');
   });
 
   it('throws AgentScoreError on failure', async () => {

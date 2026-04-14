@@ -338,14 +338,14 @@ describe('Edge cases', () => {
     await client.assess(WALLET, {
       chain: 'base',
       refresh: true,
-      policy: { min_score: 50, require_verified_payment_activity: true },
+      policy: { require_kyc: true, require_sanctions_clear: true },
     });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
     expect(body.address).toBe(WALLET);
     expect(body.chain).toBe('base');
     expect(body.refresh).toBe(true);
-    expect(body.policy).toEqual({ min_score: 50, require_verified_payment_activity: true });
+    expect(body.policy).toEqual({ require_kyc: true, require_sanctions_clear: true });
   });
 
   it('two concurrent getReputation calls both resolve correctly', async () => {
@@ -423,7 +423,6 @@ describe('Verification and compliance fields', () => {
       operator_verification: {
         level: 'kyc_verified',
         operator_type: 'business',
-        claimed_at: '2024-06-01T00:00:00Z',
         verified_at: '2024-06-15T00:00:00Z',
       },
     };
@@ -433,7 +432,6 @@ describe('Verification and compliance fields', () => {
     expect(result.operator_verification).toBeDefined();
     expect(result.operator_verification!.level).toBe('kyc_verified');
     expect(result.operator_verification!.operator_type).toBe('business');
-    expect(result.operator_verification!.claimed_at).toBe('2024-06-01T00:00:00Z');
     expect(result.operator_verification!.verified_at).toBe('2024-06-15T00:00:00Z');
   });
 
@@ -522,7 +520,6 @@ describe('Integration: compliance policy deny with verify_url', () => {
       operator_verification: {
         level: 'none',
         operator_type: null,
-        claimed_at: null,
         verified_at: null,
       },
       verify_url: 'https://agentscore.sh/verify/xyz789',
@@ -596,14 +593,14 @@ describe('AgentScore.assess() — operatorToken', () => {
     await client.assess(null, {
       operatorToken: 'opc_full',
       chain: 'base',
-      policy: { min_score: 50 },
+      policy: { require_kyc: true },
     });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
     expect(body.operator_token).toBe('opc_full');
     expect(body.chain).toBe('base');
     expect(body.address).toBeUndefined();
-    expect((body.policy as Record<string, unknown>).min_score).toBe(50);
+    expect((body.policy as Record<string, unknown>).require_kyc).toBe(true);
   });
 
   it('retries on 429 with Retry-After header', async () => {

@@ -187,9 +187,13 @@ export interface AssessOptions {
   operatorToken?: string;
 }
 
+export type PaymentMethod = 'tempo' | 'stripe';
+
 export interface SessionCreateOptions {
   context?: string;
-  metadata?: Record<string, unknown>;
+  return_url?: string;
+  payment_methods?: PaymentMethod[];
+  product_name?: string;
 }
 
 export interface SessionCreateResponse {
