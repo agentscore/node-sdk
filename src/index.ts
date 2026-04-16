@@ -68,8 +68,6 @@ export class AgentScore {
   async createSession(options?: SessionCreateOptions): Promise<SessionCreateResponse> {
     const body: Record<string, unknown> = {};
     if (options?.context) body.context = options.context;
-    if (options?.return_url) body.return_url = options.return_url;
-    if (options?.payment_methods) body.payment_methods = options.payment_methods;
     if (options?.product_name) body.product_name = options.product_name;
 
     return this.request<SessionCreateResponse>('/v1/sessions', {

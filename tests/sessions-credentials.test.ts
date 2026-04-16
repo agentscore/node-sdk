@@ -82,24 +82,6 @@ describe('AgentScore.createSession()', () => {
     expect(body.context).toBe('payment-flow');
   });
 
-  it('includes return_url in request body when provided', async () => {
-    mockFetchOk(SESSION_CREATE_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    await client.createSession({ return_url: 'https://example.com/callback' });
-    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
-    expect(body.return_url).toBe('https://example.com/callback');
-  });
-
-  it('includes payment_methods in request body when provided', async () => {
-    mockFetchOk(SESSION_CREATE_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    await client.createSession({ payment_methods: ['stripe', 'tempo'] });
-    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
-    expect(body.payment_methods).toEqual(['stripe', 'tempo']);
-  });
-
   it('includes product_name in request body when provided', async () => {
     mockFetchOk(SESSION_CREATE_RESPONSE);
     const client = new AgentScore({ apiKey: API_KEY });
@@ -114,15 +96,11 @@ describe('AgentScore.createSession()', () => {
     const client = new AgentScore({ apiKey: API_KEY });
     await client.createSession({
       context: 'onboarding',
-      return_url: 'https://example.com/done',
-      payment_methods: ['stripe'],
       product_name: 'Starter',
     });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
     expect(body.context).toBe('onboarding');
-    expect(body.return_url).toBe('https://example.com/done');
-    expect(body.payment_methods).toEqual(['stripe']);
     expect(body.product_name).toBe('Starter');
   });
 
