@@ -273,7 +273,7 @@ export interface AccountVerification {
 
 export interface CredentialListResponse {
   credentials: CredentialListItem[];
-  account_verification?: AccountVerification;
+  account_verification: AccountVerification;
 }
 
 export interface CredentialRevokeResponse {
