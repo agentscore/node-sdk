@@ -166,6 +166,14 @@ export interface AssessResponse {
   } | null;
   on_the_fly: boolean;
   updated_at: string | null;
+  explanation?: Array<{
+    rule: string;
+    passed: boolean;
+    required: unknown;
+    actual: unknown;
+    message: string;
+    how_to_remedy: string | null;
+  }>;
 }
 
 export interface AgentScoreErrorBody {
@@ -200,11 +208,22 @@ export interface SessionCreateResponse {
   expires_at: string;
 }
 
+export interface SessionPollNextSteps {
+  action: string;
+  user_message?: string;
+  header_name?: string;
+  poll_interval_seconds?: number;
+  eta_message?: string;
+}
+
 export interface SessionPollResponse {
   session_id: string;
   status: string;
   operator_token?: string;
   completed_at?: string;
+  next_steps?: SessionPollNextSteps;
+  retry_after_seconds?: number;
+  token_ttl_seconds?: number;
 }
 
 export interface CredentialCreateOptions {
@@ -221,6 +240,18 @@ export interface CredentialCreateResponse {
   created_at: string;
 }
 
+export interface CredentialCreateErrorResponse {
+  error: {
+    code: 'kyc_required';
+    message: string;
+  };
+  verify_url: string;
+  next_steps: {
+    action: string;
+    user_message: string;
+  };
+}
+
 export interface CredentialListItem {
   id: string;
   prefix: string;
@@ -230,8 +261,19 @@ export interface CredentialListItem {
   created_at: string;
 }
 
+export interface AccountVerification {
+  kyc_status: string;
+  kyc_verified_at?: string | null;
+  jurisdiction?: string | null;
+  age_verified?: boolean;
+  age_bracket?: string | null;
+  sanctions_status?: string | null;
+  operator_type?: string | null;
+}
+
 export interface CredentialListResponse {
   credentials: CredentialListItem[];
+  account_verification?: AccountVerification;
 }
 
 export interface CredentialRevokeResponse {
