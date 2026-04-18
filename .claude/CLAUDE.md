@@ -2,6 +2,18 @@
 
 TypeScript client for the AgentScore trust and reputation API.
 
+## Identity Model
+
+## Methods
+
+- `getReputation(address, options?)` — cached reputation lookup (free)
+- `assess(address, options?)` — identity gate with policy (paid). Accepts `operatorToken` for non-wallet agents.
+- `createSession(options?)` — create verification session for identity bootstrapping
+- `pollSession(sessionId, pollSecret)` — poll session status, returns credential when verified
+- `createCredential(options?)` — create operator credential (24h TTL default)
+- `listCredentials()` — list active credentials
+- `revokeCredential(id)` — revoke a credential
+
 ## Architecture
 
 Single-package TypeScript library published to npm.

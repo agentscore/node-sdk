@@ -205,10 +205,10 @@ describe('AgentScore.assess()', () => {
   it('includes policy in request body when provided', async () => {
     mockFetchOk(ASSESS_RESPONSE);
     const client = new AgentScore({ apiKey: API_KEY });
-    await client.assess(WALLET, { policy: { min_grade: 'B' } });
+    await client.assess(WALLET, { policy: { require_kyc: true } });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
-    expect(body.policy).toEqual({ min_grade: 'B' });
+    expect(body.policy).toEqual({ require_kyc: true });
   });
 
   it('includes chain in request body when provided', async () => {
@@ -338,14 +338,14 @@ describe('Edge cases', () => {
     await client.assess(WALLET, {
       chain: 'base',
       refresh: true,
-      policy: { min_score: 50, require_verified_payment_activity: true },
+      policy: { require_kyc: true, require_sanctions_clear: true },
     });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
     expect(body.address).toBe(WALLET);
     expect(body.chain).toBe('base');
     expect(body.refresh).toBe(true);
-    expect(body.policy).toEqual({ min_score: 50, require_verified_payment_activity: true });
+    expect(body.policy).toEqual({ require_kyc: true, require_sanctions_clear: true });
   });
 
   it('two concurrent getReputation calls both resolve correctly', async () => {
@@ -423,7 +423,6 @@ describe('Verification and compliance fields', () => {
       operator_verification: {
         level: 'kyc_verified',
         operator_type: 'business',
-        claimed_at: '2024-06-01T00:00:00Z',
         verified_at: '2024-06-15T00:00:00Z',
       },
     };
@@ -433,7 +432,6 @@ describe('Verification and compliance fields', () => {
     expect(result.operator_verification).toBeDefined();
     expect(result.operator_verification!.level).toBe('kyc_verified');
     expect(result.operator_verification!.operator_type).toBe('business');
-    expect(result.operator_verification!.claimed_at).toBe('2024-06-01T00:00:00Z');
     expect(result.operator_verification!.verified_at).toBe('2024-06-15T00:00:00Z');
   });
 
@@ -522,7 +520,6 @@ describe('Integration: compliance policy deny with verify_url', () => {
       operator_verification: {
         level: 'none',
         operator_type: null,
-        claimed_at: null,
         verified_at: null,
       },
       verify_url: 'https://agentscore.sh/verify/xyz789',
@@ -550,5 +547,98 @@ describe('Integration: compliance policy deny with verify_url', () => {
     const policy = body.policy as Record<string, unknown>;
     expect(policy.require_kyc).toBe(true);
     expect(policy.require_sanctions_clear).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Identity model: operatorToken in assess
+// ---------------------------------------------------------------------------
+
+describe('AgentScore.assess() — operatorToken', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('sends operator_token when operatorToken option provided without address', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(null, { operatorToken: 'opc_test_123' });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.operator_token).toBe('opc_test_123');
+    expect(body.address).toBeUndefined();
+  });
+
+  it('sends both address and operator_token when both provided', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(WALLET, { operatorToken: 'opc_both_456' });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.address).toBe(WALLET);
+    expect(body.operator_token).toBe('opc_both_456');
+  });
+
+  it('sends only address when no operatorToken (backwards compat)', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(WALLET);
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.address).toBe(WALLET);
+    expect(body.operator_token).toBeUndefined();
+  });
+
+  it('sends operator_token with policy and chain combined', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(null, {
+      operatorToken: 'opc_full',
+      chain: 'base',
+      policy: { require_kyc: true },
+    });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.operator_token).toBe('opc_full');
+    expect(body.chain).toBe('base');
+    expect(body.address).toBeUndefined();
+    expect((body.policy as Record<string, unknown>).require_kyc).toBe(true);
+  });
+
+  it('retries on 429 with Retry-After header', async () => {
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'retry-after': '0' }),
+        json: vi.fn().mockResolvedValueOnce({}),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValueOnce(REPUTATION_RESPONSE),
+      } as unknown as Response);
+
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.getReputation(WALLET);
+    expect(result.score.grade).toBe('A');
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws after 429 retry fails', async () => {
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'retry-after': '0' }),
+        json: vi.fn().mockResolvedValueOnce({}),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        json: vi.fn().mockResolvedValueOnce({}),
+      } as unknown as Response);
+
+    const client = new AgentScore({ apiKey: API_KEY });
+    await expect(client.getReputation(WALLET)).rejects.toThrow(AgentScoreError);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 });
