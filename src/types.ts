@@ -138,7 +138,6 @@ export interface DecisionPolicy {
   min_age?: number;
   blocked_jurisdictions?: string[];
   allowed_jurisdictions?: string[];
-  require_entity_type?: string;
 }
 
 export interface AssessRequest {
