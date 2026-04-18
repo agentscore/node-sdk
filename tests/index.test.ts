@@ -466,7 +466,6 @@ describe('Verification and compliance fields', () => {
         require_sanctions_clear: true,
         min_age: 90,
         blocked_jurisdictions: ['KP', 'IR'],
-        require_entity_type: 'agent',
       },
     });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
@@ -476,7 +475,6 @@ describe('Verification and compliance fields', () => {
     expect(policy.require_sanctions_clear).toBe(true);
     expect(policy.min_age).toBe(90);
     expect(policy.blocked_jurisdictions).toEqual(['KP', 'IR']);
-    expect(policy.require_entity_type).toBe('agent');
   });
 
   it('assess sends resolved_operator when present in response', async () => {
