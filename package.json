@@ -58,7 +58,7 @@
     "eslint-plugin-unused-imports": "^4.4.1",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.58.2",
+    "typescript-eslint": "^8.59.0",
     "vitest": "^4.1.4"
   }
 }
