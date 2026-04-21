@@ -90,6 +90,15 @@ describe('AgentScore constructor', () => {
     const headers = call[1].headers as Record<string, string>;
     expect(headers['User-Agent']).toBe(`agentscore-sdk/${__VERSION__}`);
   });
+
+  it('prepends custom userAgent to the default when configured', async () => {
+    mockFetchOk(REPUTATION_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY, userAgent: 'my-app/1.2.3' });
+    await client.getReputation(WALLET);
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const headers = call[1].headers as Record<string, string>;
+    expect(headers['User-Agent']).toBe(`my-app/1.2.3 (agentscore-sdk/${__VERSION__})`);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -27,6 +27,7 @@ export class AgentScore {
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly timeout: number;
+  private readonly userAgent: string;
 
   constructor(config: AgentScoreConfig) {
     if (!config.apiKey) {
@@ -37,6 +38,8 @@ export class AgentScore {
     this.baseUrl = base;
     this.apiKey = config.apiKey;
     this.timeout = config.timeout ?? DEFAULT_TIMEOUT;
+    const defaultUa = `agentscore-sdk/${__VERSION__}`;
+    this.userAgent = config.userAgent ? `${config.userAgent} (${defaultUa})` : defaultUa;
   }
 
   async getReputation(address: string, options?: GetReputationOptions): Promise<ReputationResponse> {
@@ -115,7 +118,7 @@ export class AgentScore {
     const headers: Record<string, string> = {
       ...(options?.headers as Record<string, string>),
       'X-API-Key': this.apiKey,
-      'User-Agent': `agentscore-sdk/${__VERSION__}`,
+      'User-Agent': this.userAgent,
     };
 
     const controller = new AbortController();
