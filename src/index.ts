@@ -4,6 +4,8 @@ import type {
   AgentScoreErrorBody,
   AssessOptions,
   AssessResponse,
+  AssociateWalletOptions,
+  AssociateWalletResponse,
   CredentialCreateOptions,
   CredentialCreateResponse,
   CredentialListResponse,
@@ -110,6 +112,26 @@ export class AgentScore {
       `/v1/credentials/${encodeURIComponent(id)}`,
       { method: 'DELETE' },
     );
+  }
+
+  /**
+   * Report that a wallet paid under an operator credential. Paid-tier merchants observing
+   * agent payments call this passively to build a cross-merchant credential↔wallet profile.
+   *
+   * Fire-and-forget friendly — the returned `first_seen` boolean is informational only.
+   */
+  async associateWallet(options: AssociateWalletOptions): Promise<AssociateWalletResponse> {
+    const body: Record<string, unknown> = {
+      operator_token: options.operatorToken,
+      wallet_address: options.walletAddress,
+      network: options.network,
+    };
+    if (options.idempotencyKey) body.idempotency_key = options.idempotencyKey;
+    return this.request<AssociateWalletResponse>('/v1/credentials/wallets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
   }
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {

@@ -418,3 +418,87 @@ describe('AgentScore.revokeCredential()', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// associateWallet
+// ---------------------------------------------------------------------------
+
+const ASSOCIATE_OPTIONS = {
+  operatorToken: 'opc_' + 'a'.repeat(48),
+  walletAddress: '0xabcdef1234567890abcdef1234567890abcdef12',
+  network: 'evm' as const,
+};
+
+describe('AgentScore.associateWallet()', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('returns { associated, first_seen } on success', async () => {
+    mockFetchOk({ associated: true, first_seen: true });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.associateWallet(ASSOCIATE_OPTIONS);
+    expect(result).toEqual({ associated: true, first_seen: true });
+  });
+
+  it('sends a POST with snake_case body fields to /v1/credentials/wallets', async () => {
+    mockFetchOk({ associated: true, first_seen: false });
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.associateWallet(ASSOCIATE_OPTIONS);
+
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toContain('/v1/credentials/wallets');
+    expect(call[1].method).toBe('POST');
+    const body = JSON.parse(call[1].body as string);
+    expect(body).toEqual({
+      operator_token: ASSOCIATE_OPTIONS.operatorToken,
+      wallet_address: ASSOCIATE_OPTIONS.walletAddress,
+      network: ASSOCIATE_OPTIONS.network,
+    });
+  });
+
+  it('forwards idempotencyKey as snake_case idempotency_key in the body', async () => {
+    mockFetchOk({ associated: true, first_seen: false, deduped: true });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.associateWallet({ ...ASSOCIATE_OPTIONS, idempotencyKey: 'pi_abc' });
+
+    expect(result).toEqual({ associated: true, first_seen: false, deduped: true });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string);
+    expect(body.idempotency_key).toBe('pi_abc');
+  });
+
+  it('omits idempotency_key entirely when not provided', async () => {
+    mockFetchOk({ associated: true, first_seen: true });
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.associateWallet(ASSOCIATE_OPTIONS);
+
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string);
+    expect(body).not.toHaveProperty('idempotency_key');
+  });
+
+  it('throws AgentScoreError on 401 invalid_credential (matches /v1/assess for anti-enumeration)', async () => {
+    mockFetchError(401, { error: { code: 'invalid_credential', message: 'Operator credential not found' } });
+    const client = new AgentScore({ apiKey: API_KEY });
+    await expect(client.associateWallet(ASSOCIATE_OPTIONS)).rejects.toBeInstanceOf(AgentScoreError);
+  });
+
+  it('throws AgentScoreError with correct code on 400 invalid_wallet', async () => {
+    expect.assertions(3);
+    mockFetchError(400, { error: { code: 'invalid_wallet', message: 'bad wallet' } });
+    const client = new AgentScore({ apiKey: API_KEY });
+    try {
+      await client.associateWallet({ ...ASSOCIATE_OPTIONS, walletAddress: '0xnope' });
+    } catch (e) {
+      expect(e).toBeInstanceOf(AgentScoreError);
+      const err = e as AgentScoreError;
+      expect(err.code).toBe('invalid_wallet');
+      expect(err.status).toBe(400);
+    }
+  });
+
+  it('throws AgentScoreError on 402 payment_required (free tier)', async () => {
+    mockFetchError(402, { error: { code: 'payment_required', message: 'paid only' } });
+    const client = new AgentScore({ apiKey: API_KEY });
+    await expect(client.associateWallet(ASSOCIATE_OPTIONS)).rejects.toBeInstanceOf(AgentScoreError);
+  });
+});

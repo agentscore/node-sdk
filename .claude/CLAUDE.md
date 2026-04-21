@@ -13,6 +13,7 @@ TypeScript client for the AgentScore trust and reputation API.
 - `createCredential(options?)` — create operator credential (24h TTL default)
 - `listCredentials()` — list active credentials
 - `revokeCredential(id)` — revoke a credential
+- `associateWallet({ operatorToken, walletAddress, network, idempotencyKey? })` — report a signer wallet seen paying under a credential (TEC-189). Fire-and-forget; use the payment intent id / tx hash as `idempotencyKey` so retries don't inflate transaction_count.
 
 ## Architecture
 
