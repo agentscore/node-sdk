@@ -38,7 +38,7 @@ export class AgentScore {
     this.baseUrl = base;
     this.apiKey = config.apiKey;
     this.timeout = config.timeout ?? DEFAULT_TIMEOUT;
-    const defaultUa = `agentscore-sdk/${__VERSION__}`;
+    const defaultUa = `@agent-score/sdk@${__VERSION__}`;
     this.userAgent = config.userAgent ? `${config.userAgent} (${defaultUa})` : defaultUa;
   }
 

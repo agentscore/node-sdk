@@ -2,7 +2,7 @@ export interface AgentScoreConfig {
   apiKey: string;
   baseUrl?: string;
   timeout?: number;
-  /** Prepended to the default User-Agent as `"{userAgent} (agentscore-sdk/{version})"`. Use to attribute API calls to your app. */
+  /** Prepended to the default User-Agent as `"{userAgent} (@agent-score/sdk@{version})"`. Use to attribute API calls to your app. */
   userAgent?: string;
 }
 
