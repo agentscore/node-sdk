@@ -87,11 +87,12 @@ await client.revokeCredential(cred.id);
 
 ## Configuration
 
-| Option    | Type     | Default                     | Description              |
-| --------- | -------- | --------------------------- | ------------------------ |
-| `apiKey`  | `string` | ---                         | API key from [agentscore.sh](https://agentscore.sh) |
-| `baseUrl` | `string` | `https://api.agentscore.sh` | API base URL             |
-| `timeout` | `number` | `10000`                     | Request timeout in ms    |
+| Option      | Type     | Default                     | Description              |
+| ----------- | -------- | --------------------------- | ------------------------ |
+| `apiKey`    | `string` | ---                         | API key from [agentscore.sh](https://agentscore.sh) |
+| `baseUrl`   | `string` | `https://api.agentscore.sh` | API base URL             |
+| `timeout`   | `number` | `10000`                     | Request timeout in ms    |
+| `userAgent` | `string` | ---                         | Prepended to the default `User-Agent` as `"{userAgent} (@agent-score/sdk@{version})"`. Use to attribute API calls to your app. |
 
 ## Error Handling
 
