@@ -281,3 +281,26 @@ export interface CredentialRevokeResponse {
   id: string;
   revoked: true;
 }
+
+export interface AssociateWalletOptions {
+  /** Operator credential (opc_...) that the agent authenticated with on the gated endpoint. */
+  operatorToken: string;
+  /** The signer wallet recovered from the payment payload — EVM `from` from EIP-3009 for x402,
+   *  the `did:pkh` address for Tempo MPP, or a Solana base58 pubkey. */
+  walletAddress: string;
+  /** Key-derivation family. EVM EOAs share identity across every EVM chain (Base, Tempo,
+   *  Ethereum, …) so `"evm"` covers them all. Use `"solana"` for Solana addresses. */
+  network: 'evm' | 'solana';
+  /** Optional stable key for the logical payment (e.g., Stripe PI id, x402 tx hash). When the
+   *  same key is seen again for the same (credential, wallet, network), the server no-ops —
+   *  `transaction_count` isn't inflated by agent retries. */
+  idempotencyKey?: string;
+}
+
+export interface AssociateWalletResponse {
+  associated: true;
+  /** True if this credential↔wallet pairing was seen for the first time. False if the row already existed. */
+  first_seen: boolean;
+  /** Present and `true` when the call was deduped against a prior matching `idempotency_key`. */
+  deduped?: boolean;
+}

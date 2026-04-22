@@ -4,6 +4,8 @@ import type {
   AgentScoreErrorBody,
   AssessOptions,
   AssessResponse,
+  AssociateWalletOptions,
+  AssociateWalletResponse,
   CredentialCreateOptions,
   CredentialCreateResponse,
   CredentialListResponse,
@@ -110,6 +112,35 @@ export class AgentScore {
       `/v1/credentials/${encodeURIComponent(id)}`,
       { method: 'DELETE' },
     );
+  }
+
+  /**
+   * Report that a wallet paid under an operator credential. Paid-tier merchants observing
+   * agent payments call this passively to build a cross-merchant credential↔wallet profile.
+   *
+   * Fire-and-forget friendly — the returned `first_seen` boolean is informational only.
+   */
+  async associateWallet(options: AssociateWalletOptions): Promise<AssociateWalletResponse> {
+    const body: Record<string, unknown> = {
+      operator_token: options.operatorToken,
+      wallet_address: options.walletAddress,
+      network: options.network,
+    };
+    if (options.idempotencyKey) {
+      if (options.idempotencyKey.length > 200) {
+        // Server truncates to 200 chars before storing. A caller sending a longer key
+        // and re-sending the same long key later would still dedup (both truncate to
+        // the same 200 chars), but any caller generating distinct keys that share the
+        // first 200 chars would silently collide. Warn loud enough to catch in dev.
+        console.warn('[@agent-score/sdk] associateWallet: idempotencyKey is longer than 200 chars and will be truncated server-side.');
+      }
+      body.idempotency_key = options.idempotencyKey;
+    }
+    return this.request<AssociateWalletResponse>('/v1/credentials/wallets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
   }
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {

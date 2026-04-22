@@ -85,6 +85,19 @@ console.log(list); // active, non-expired credentials
 await client.revokeCredential(cred.id);
 ```
 
+### Report an Agent's Wallet (Cross-Merchant Attribution)
+
+After an agent authenticated via `operator_token` completes a payment, report the signer wallet so AgentScore can build a cross-merchant credential↔wallet profile. Fire-and-forget — `first_seen` is informational only. `network` is the key-derivation family: `"evm"` for any EVM chain (Base, Tempo, Ethereum, …) or `"solana"` for Solana.
+
+```typescript
+await client.associateWallet({
+  operatorToken: "opc_...",
+  walletAddress: signerFromPayment, // e.g. EIP-3009 `from` or Tempo MPP DID address
+  network: "evm",
+  idempotencyKey: paymentIntentId, // optional — agent retries of the same payment no-op
+});
+```
+
 ## Configuration
 
 | Option      | Type     | Default                     | Description              |
