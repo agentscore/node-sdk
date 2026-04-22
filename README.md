@@ -62,9 +62,9 @@ console.log(result.decision); // "allow" | "deny"
 Bootstrap identity for first-time agents:
 
 ```typescript
-// Create a session — returns a URL for the user to verify
+// Create a session — returns a verify_url for the user and a poll_url for the agent
 const session = await client.createSession();
-console.log(session.verify_url, session.poll_secret);
+console.log(session.verify_url, session.poll_url, session.poll_secret);
 
 // Poll until the user completes verification
 const status = await client.pollSession(session.session_id, session.poll_secret);
