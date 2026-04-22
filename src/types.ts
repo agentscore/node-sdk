@@ -215,6 +215,10 @@ export interface SessionPollNextSteps {
   header_name?: string;
   poll_interval_seconds?: number;
   eta_message?: string;
+  /** Present when `action === 'contact_support'` (e.g. sanctions `flagged` status). */
+  support_email?: string;
+  /** Suggested subject line for the support email. */
+  support_subject?: string;
 }
 
 export interface SessionPollResponse {
