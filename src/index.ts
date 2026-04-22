@@ -126,7 +126,16 @@ export class AgentScore {
       wallet_address: options.walletAddress,
       network: options.network,
     };
-    if (options.idempotencyKey) body.idempotency_key = options.idempotencyKey;
+    if (options.idempotencyKey) {
+      if (options.idempotencyKey.length > 200) {
+        // Server truncates to 200 chars before storing. A caller sending a longer key
+        // and re-sending the same long key later would still dedup (both truncate to
+        // the same 200 chars), but any caller generating distinct keys that share the
+        // first 200 chars would silently collide. Warn loud enough to catch in dev.
+        console.warn('[@agent-score/sdk] associateWallet: idempotencyKey is longer than 200 chars and will be truncated server-side.');
+      }
+      body.idempotency_key = options.idempotencyKey;
+    }
     return this.request<AssociateWalletResponse>('/v1/credentials/wallets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
