@@ -59,12 +59,13 @@ console.log(result.decision); // "allow" | "deny"
 
 ### Verification Sessions
 
-Bootstrap identity for first-time agents:
+Bootstrap identity for first-time agents. The success body carries structured `next_steps` (with `action: "deliver_verify_url_and_poll"`) and a cross-merchant `agent_memory` hint. Poll responses carry `next_steps.action` from the typed `NextStepsAction` union (`continue_polling`, `retry_merchant_request_with_operator_token`, `use_stored_operator_token`, `create_new_session`, `verification_failed`, `contact_support`).
 
 ```typescript
 // Create a session — returns a verify_url for the user and a poll_url for the agent
 const session = await client.createSession();
 console.log(session.verify_url, session.poll_url, session.poll_secret);
+console.log(session.next_steps.action); // "deliver_verify_url_and_poll"
 
 // Poll until the user completes verification
 const status = await client.pollSession(session.session_id, session.poll_secret);
@@ -72,6 +73,10 @@ if (status.status === "verified") {
   console.log(status.operator_token); // "opc_..." — use for future requests
 }
 ```
+
+### Wallet resolution
+
+`assess()` responses include `resolved_operator` and `linked_wallets[]` — all same-operator sibling wallets (claimed via SIWE or captured via prior `associateWallet`). Merchants doing wallet-signer-match checks should accept a payment signed by any address in `linked_wallets`.
 
 ### Credential Management
 
