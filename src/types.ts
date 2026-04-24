@@ -155,6 +155,11 @@ export interface AssessResponse {
   identity_method: 'wallet' | 'operator_token';
   operator_verification?: OperatorVerification;
   resolved_operator?: string | null;
+  /** Wallets linked to the same operator as the resolved identity (TEC-226). Populated on
+   *  allow responses; omitted on denials to avoid leaking the linked set for flagged operators.
+   *  Returned regardless of identity_method so agents can enumerate all wallets they could
+   *  sign with to satisfy a wallet-auth claim. Capped at 100 entries. */
+  linked_wallets?: string[];
   verify_url?: string;
   policy_result?: {
     all_passed: boolean;
