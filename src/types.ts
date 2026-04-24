@@ -191,6 +191,10 @@ export interface AgentScoreErrorBody {
   /** Cross-merchant pattern hint for agents to persist to memory. Present on bootstrap
    *  denials (`operator_verification_required`) and session-create responses. */
   agent_memory?: AgentMemoryHint;
+  /** JSON-encoded action copy (`{action, steps, user_message}`) emitted on every
+   *  gate denial so agents see a concrete recovery path in the response itself. Parse
+   *  as JSON; `action` will be a `NextStepsAction`. Absent on plain API errors. */
+  agent_instructions?: string;
 }
 
 /**
@@ -271,8 +275,16 @@ export interface WalletSignerMismatchBody {
   expected_signer?: string;
   actual_signer?: string;
   linked_wallets: string[];
-  next_steps: {
-    action: 'regenerate_payment_from_linked_wallet';
+  /** JSON-encoded `{action: 'resign_or_switch_to_operator_token', steps, user_message}`.
+   *  Present when the merchant uses the gate's default denial marshaller. Merchants that
+   *  override with their own `next_steps` may emit that instead — parse whichever is present. */
+  agent_instructions?: string;
+  /** Structured action guidance. Present when the merchant overrides the gate default with
+   *  a custom `next_steps`. `action` may be any `NextStepsAction` — typically
+   *  `resign_or_switch_to_operator_token` (gate default) or
+   *  `regenerate_payment_from_linked_wallet` (legacy merchant override). */
+  next_steps?: {
+    action: NextStepsAction;
     user_message?: string;
     learn_more_url?: string;
   };
@@ -289,8 +301,14 @@ export interface WalletAuthRequiresSigningBody {
     code: 'wallet_auth_requires_wallet_signing';
     message: string;
   };
-  next_steps: {
-    action: 'use_operator_token';
+  /** JSON-encoded `{action: 'switch_to_operator_token', steps, user_message}`. Present when
+   *  the merchant uses the gate's default denial marshaller. */
+  agent_instructions?: string;
+  /** Structured action guidance. Present when the merchant overrides the gate default.
+   *  `action` is typically `switch_to_operator_token` (gate default) or `use_operator_token`
+   *  (legacy merchant override). */
+  next_steps?: {
+    action: NextStepsAction;
     user_message?: string;
     /** Rails that carry a wallet signature and can be used under wallet-auth. */
     signer_capable_rails?: string[];
@@ -351,12 +369,21 @@ export interface SessionCreateResponse {
   verify_url: string;
   poll_url: string;
   expires_at: string;
+  /** Structured `next_steps.action: 'deliver_verify_url_and_poll'` with step-by-step
+   *  instructions for consuming the session. */
+  next_steps?: {
+    action: NextStepsAction;
+    poll_interval_seconds?: number;
+    poll_secret_header?: string;
+    steps?: string[];
+    user_message?: string;
+  };
   /** Cross-merchant memory hint for agents on first session creation. */
   agent_memory?: AgentMemoryHint;
 }
 
 export interface SessionPollNextSteps {
-  action: string;
+  action: NextStepsAction;
   user_message?: string;
   header_name?: string;
   poll_interval_seconds?: number;
@@ -399,7 +426,7 @@ export interface CredentialCreateErrorResponse {
   };
   verify_url: string;
   next_steps: {
-    action: string;
+    action: NextStepsAction;
     user_message: string;
   };
 }
