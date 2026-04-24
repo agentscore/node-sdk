@@ -204,9 +204,11 @@ export interface AgentScoreErrorBody {
  *     different operator (or isn't linked to any operator).
  *   - `wallet_auth_requires_wallet_signing`: X-Wallet-Address claimed with a payment rail that
  *     has no wallet signer (SPT, card). Agent should switch to X-Operator-Token.
- *   - `token_expired`: operator token valid-shape but past its TTL. Agent should mint a new
- *     credential via POST /v1/credentials, no re-KYC needed.
- *   - `token_revoked`: operator token was revoked. Agent should stop and surface to user.
+ *   - `token_expired`: operator token is no longer valid (revoked or past its TTL —
+ *     the two cases share this code deliberately so the API doesn't leak which one).
+ *     The 401 body carries an auto-minted session (`verify_url`, `session_id`, `poll_secret`)
+ *     so the agent can recover without an API key: share `verify_url` with the user, poll
+ *     until verified, receive a fresh operator_token. Existing account KYC persists.
  */
 export type DenialCode =
   | 'operator_verification_required'
@@ -220,8 +222,7 @@ export type DenialCode =
   | 'kyc_required'
   | 'wallet_signer_mismatch'
   | 'wallet_auth_requires_wallet_signing'
-  | 'token_expired'
-  | 'token_revoked';
+  | 'token_expired';
 
 /**
  * Recommended agent action encoded in `next_steps.action`. Granular codes let agents pick the

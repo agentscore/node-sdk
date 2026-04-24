@@ -21,9 +21,8 @@ describe('1.9.0 types', () => {
       'wallet_signer_mismatch',
       'wallet_auth_requires_wallet_signing',
       'token_expired',
-      'token_revoked',
     ];
-    expect(codes).toHaveLength(6);
+    expect(codes).toHaveLength(5);
   });
 
   it('accepts all new NextStepsAction values', () => {
