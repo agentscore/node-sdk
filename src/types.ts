@@ -232,10 +232,28 @@ export type NextStepsAction =
   | 'regenerate_payment_credential'
   | 'none'
   | 'done'
-  | 'send_existing_identity'
   | 'mint_new_credential'
   | 'use_operator_token'
-  | 'regenerate_payment_from_linked_wallet';
+  | 'regenerate_payment_from_linked_wallet'
+  // Gate-emitted probe strategy: try wallet on signing rails, fall back to stored
+  // opc_..., fall back to session flow. Emitted on bare missing_identity 403s.
+  | 'probe_identity_then_session'
+  // Wallet signer mismatch: re-sign from expected_signer / any linked_wallets entry,
+  // or drop X-Wallet-Address and retry with X-Operator-Token.
+  | 'resign_or_switch_to_operator_token'
+  // Non-signing rail (Stripe SPT, card): X-Wallet-Address has no signature to verify.
+  // Drop the wallet header and use X-Operator-Token.
+  | 'switch_to_operator_token'
+  // Session creation success — deliver verify_url to the user and poll poll_url until
+  // operator_token issues. Emitted on POST /v1/sessions.
+  | 'deliver_verify_url_and_poll'
+  // Session poll states.
+  | 'continue_polling'
+  | 'retry_merchant_request_with_operator_token'
+  | 'use_stored_operator_token'
+  | 'create_new_session'
+  | 'verification_failed'
+  | 'complete_kyc_then_retry';
 
 /**
  * Error body shape for `wallet_signer_mismatch` denials. The claimed wallet's operator

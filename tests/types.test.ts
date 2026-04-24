@@ -28,14 +28,23 @@ describe('1.9.0 types', () => {
 
   it('accepts all new NextStepsAction values', () => {
     const actions: NextStepsAction[] = [
-      'send_existing_identity',
+      // Probe strategy (gate-emitted missing_identity).
+      'probe_identity_then_session',
+      'resign_or_switch_to_operator_token',
+      'switch_to_operator_token',
+      'deliver_verify_url_and_poll',
+      // Session poll states.
+      'continue_polling',
+      'retry_merchant_request_with_operator_token',
+      'use_stored_operator_token',
+      // Backward-compat: pre-1.9.0 actions still present.
       'mint_new_credential',
       'use_operator_token',
       'regenerate_payment_from_linked_wallet',
       'poll_for_credential',
       'contact_support',
     ];
-    expect(actions).toHaveLength(6);
+    expect(actions).toHaveLength(12);
   });
 
   it('WalletSignerMismatchBody shape', () => {
