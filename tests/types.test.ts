@@ -9,9 +9,9 @@ import type {
   WalletSignerMismatchBody,
 } from '../src/index';
 
-// Compile-time type-presence checks for types introduced in 1.9.0 (TEC-226/218/227).
-// The tests themselves just exercise the runtime-visible shape so vitest has something
-// to run; the real assertion is that the file type-checks.
+// Compile-time type-presence checks for the denial-code, memory-hint, and wallet-signer
+// body types. Runtime assertions exist only to give vitest something to execute; the real
+// verification is that the file type-checks.
 
 describe('1.9.0 types', () => {
   it('accepts all new DenialCode values', () => {

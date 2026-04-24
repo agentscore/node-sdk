@@ -155,8 +155,8 @@ export interface AssessResponse {
   identity_method: 'wallet' | 'operator_token';
   operator_verification?: OperatorVerification;
   resolved_operator?: string | null;
-  /** Wallets linked to the same operator as the resolved identity (TEC-226). Populated on
-   *  allow responses; omitted on denials to avoid leaking the linked set for flagged operators.
+  /** Wallets linked to the same operator as the resolved identity. Populated on allow
+   *  responses; omitted on denials to avoid leaking the linked set for flagged operators.
    *  Returned regardless of identity_method so agents can enumerate all wallets they could
    *  sign with to satisfy a wallet-auth claim. Capped at 100 entries. */
   linked_wallets?: string[];
@@ -188,26 +188,23 @@ export interface AgentScoreErrorBody {
     message: string;
     [key: string]: unknown;
   };
-  /** Cross-merchant pattern hint for agents to persist to memory (TEC-227). Present on bootstrap
+  /** Cross-merchant pattern hint for agents to persist to memory. Present on bootstrap
    *  denials (`operator_verification_required`) and session-create responses. */
   agent_memory?: AgentMemoryHint;
 }
 
 /**
- * Denial codes returned by the gate in 403/402 error bodies. Additive — old codes retained for
- * backward compat.
+ * Denial codes returned by the gate in 403/402 error bodies.
  *
- * New in 1.9.0:
  *   - `wallet_signer_mismatch`: X-Wallet-Address claimed, but the payment signer resolves to a
- *     different operator (or isn't linked to any operator). TEC-226.
+ *     different operator (or isn't linked to any operator).
  *   - `wallet_auth_requires_wallet_signing`: X-Wallet-Address claimed with a payment rail that
- *     has no wallet signer (SPT, card). Agent should switch to X-Operator-Token. TEC-226.
+ *     has no wallet signer (SPT, card). Agent should switch to X-Operator-Token.
  *   - `token_expired`: operator token valid-shape but past its TTL. Agent should mint a new
- *     credential via POST /v1/credentials, no re-KYC needed. TEC-218.
- *   - `token_revoked`: operator token was revoked. Agent should stop and surface to user. TEC-218.
+ *     credential via POST /v1/credentials, no re-KYC needed.
+ *   - `token_revoked`: operator token was revoked. Agent should stop and surface to user.
  */
 export type DenialCode =
-  // Pre-1.9.0
   | 'operator_verification_required'
   | 'compliance_denied'
   | 'compliance_error'
@@ -217,19 +214,17 @@ export type DenialCode =
   | 'payment_required'
   | 'api_error'
   | 'kyc_required'
-  // Added in 1.9.0
   | 'wallet_signer_mismatch'
   | 'wallet_auth_requires_wallet_signing'
   | 'token_expired'
   | 'token_revoked';
 
 /**
- * Recommended agent action encoded in `next_steps.action`. Granular codes added in 1.9.0 (TEC-218)
- * let agents pick the right remediation (mint new credential vs. re-verify vs. switch identity
- * path) without parsing natural-language `user_message`.
+ * Recommended agent action encoded in `next_steps.action`. Granular codes let agents pick the
+ * right remediation (mint new credential vs. re-verify vs. switch identity path) without
+ * parsing natural-language `user_message`.
  */
 export type NextStepsAction =
-  // Pre-1.9.0
   | 'poll_for_credential'
   | 'contact_support'
   | 'retry'
@@ -237,14 +232,13 @@ export type NextStepsAction =
   | 'regenerate_payment_credential'
   | 'none'
   | 'done'
-  // Added in 1.9.0
   | 'send_existing_identity'
   | 'mint_new_credential'
   | 'use_operator_token'
   | 'regenerate_payment_from_linked_wallet';
 
 /**
- * Error body shape for `wallet_signer_mismatch` denials (TEC-226). The claimed wallet's operator
+ * Error body shape for `wallet_signer_mismatch` denials. The claimed wallet's operator
  * doesn't match the signer's operator. `actual_signer_operator` is null when the signer isn't
  * linked to any operator (treat as a different identity). `linked_wallets` lists the wallets the
  * agent could sign with to satisfy the claim.
@@ -268,7 +262,7 @@ export interface WalletSignerMismatchBody {
 }
 
 /**
- * Error body for `wallet_auth_requires_wallet_signing` denials (TEC-226). Fired when
+ * Error body for `wallet_auth_requires_wallet_signing` denials. Fired when
  * `X-Wallet-Address` is combined with a payment rail that has no wallet signer (SPT, card).
  * The agent should switch to `X-Operator-Token` to use those rails.
  */
@@ -288,8 +282,8 @@ export interface WalletAuthRequiresSigningBody {
 }
 
 /**
- * Identity-path guidance in the agent_memory payload (TEC-227). Tells agents which header to send
- * on future AgentScore-gated endpoints based on the payment rail they plan to use.
+ * Identity-path guidance in the agent_memory payload. Tells agents which header to send on
+ * future AgentScore-gated endpoints based on the payment rail they plan to use.
  */
 export interface AgentMemoryIdentityPaths {
   wallet: string;
@@ -298,9 +292,9 @@ export interface AgentMemoryIdentityPaths {
 
 /**
  * Structured hint emitted by AgentScore-gated endpoints on bootstrap denials
- * (`operator_verification_required`) and `POST /v1/sessions` success responses (TEC-227).
- * LLM-hosted agents should save this to their long-term memory so future AgentScore encounters
- * skip the cold-start session flow.
+ * (`operator_verification_required`) and `POST /v1/sessions` success responses. LLM-hosted
+ * agents should save this to their long-term memory so future AgentScore encounters skip the
+ * cold-start session flow.
  *
  * Contents are the pattern, not secrets. `do_not_persist_in_memory` names bearer credentials
  * that belong in a credential store, not an LLM memory.
@@ -339,7 +333,7 @@ export interface SessionCreateResponse {
   verify_url: string;
   poll_url: string;
   expires_at: string;
-  /** Cross-merchant memory hint for agents on first session creation (TEC-227). */
+  /** Cross-merchant memory hint for agents on first session creation. */
   agent_memory?: AgentMemoryHint;
 }
 
@@ -374,9 +368,10 @@ export interface CredentialCreateResponse {
   id: string;
   credential: string;
   prefix: string;
-  label: string;
+  label: string | null;
   expires_at: string;
   created_at: string;
+  agent_memory?: AgentMemoryHint;
 }
 
 export interface CredentialCreateErrorResponse {
@@ -394,8 +389,8 @@ export interface CredentialCreateErrorResponse {
 export interface CredentialListItem {
   id: string;
   prefix: string;
-  label: string;
-  expires_at: string;
+  label: string | null;
+  expires_at: string | null;
   last_used_at: string | null;
   created_at: string;
 }
