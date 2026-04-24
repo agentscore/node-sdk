@@ -37,13 +37,12 @@ describe('1.9.0 types', () => {
       'retry_merchant_request_with_operator_token',
       'use_stored_operator_token',
       // Backward-compat: pre-1.9.0 actions still present.
-      'mint_new_credential',
       'use_operator_token',
       'regenerate_payment_from_linked_wallet',
       'poll_for_credential',
       'contact_support',
     ];
-    expect(actions).toHaveLength(12);
+    expect(actions).toHaveLength(11);
   });
 
   it('WalletSignerMismatchBody shape', () => {
