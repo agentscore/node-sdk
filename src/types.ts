@@ -481,4 +481,8 @@ export interface AssociateWalletResponse {
   first_seen: boolean;
   /** Present and `true` when the call was deduped against a prior matching `idempotency_key`. */
   deduped?: boolean;
+  /** Cross-merchant pattern hint. Emitted only on the first wallet capture (`first_seen: true`)
+   *  so merchants can relay it once in a 402 body and LLM-hosted agents persist the pattern
+   *  to long-term memory. Absent on all subsequent captures. */
+  agent_memory?: AgentMemoryHint;
 }
