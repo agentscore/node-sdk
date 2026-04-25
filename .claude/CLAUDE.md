@@ -4,7 +4,7 @@ TypeScript client for the AgentScore trust and reputation API.
 
 ## Identity Model
 
-Two identity paths: `X-Wallet-Address` (wallet-based) and `X-Operator-Token` (credential-based). `assess()` responses include `resolved_operator` and `linked_wallets[]` (same-operator sibling wallets — all resolve to the same canonical operator). `createSession()` and `createCredential()` responses include an `agent_memory` cross-merchant pattern hint. `createSession()` also returns `next_steps.action: "deliver_verify_url_and_poll"` + polling instructions. `pollSession()` returns `next_steps.action` of `continue_polling`, `retry_merchant_request_with_operator_token`, `use_stored_operator_token`, `create_new_session`, `verification_failed`, or `contact_support` depending on state.
+Two identity paths: `X-Wallet-Address` (wallet-based) and `X-Operator-Token` (credential-based). Wallet addresses accept both EVM (`0x...` 40-hex) and Solana (base58, 32–44 chars) formats — network is auto-detected from the address shape. `assess()` responses include `resolved_operator` and `linked_wallets[]` (same-operator sibling wallets, normalized per network — EVM lowercased, Solana base58 verbatim; may mix chains for cross-chain operators). `createSession()` and `createCredential()` responses include an `agent_memory` cross-merchant pattern hint. `createSession()` also returns `next_steps.action: "deliver_verify_url_and_poll"` + polling instructions. `pollSession()` returns `next_steps.action` of `continue_polling`, `retry_merchant_request_with_operator_token`, `use_stored_operator_token`, `create_new_session`, `verification_failed`, or `contact_support` depending on state.
 
 ## Methods
 
