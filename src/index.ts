@@ -23,6 +23,7 @@ export {
   type VerifyWebhookSignatureInput,
   type VerifyWebhookSignatureResult,
 } from './webhooks';
+export { AGENTSCORE_TEST_ADDRESSES, isAgentScoreTestAddress } from './test-mode';
 export * from './types';
 
 declare const __VERSION__: string;
