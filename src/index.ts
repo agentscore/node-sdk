@@ -168,10 +168,19 @@ export class AgentScore {
         const waitMs = retryAfter ? Number(retryAfter) * 1000 : 1000;
         await new Promise((resolve) => setTimeout(resolve, Math.min(waitMs, 10_000)));
 
-        const retry = await fetch(url, { ...options, headers, signal });
-        if (retry.ok) return (await retry.json()) as T;
+        // Fresh controller for the retry. Reusing the original signal would let a stale
+        // timeout abort the retry mid-flight (the original timer keeps running while we
+        // wait retry-after, and may already have fired by the time the retry starts).
+        const retryController = new AbortController();
+        const retryTimer = setTimeout(() => retryController.abort(), this.timeout);
+        try {
+          const retry = await fetch(url, { ...options, headers, signal: retryController.signal });
+          if (retry.ok) return (await retry.json()) as T;
 
-        throw new AgentScoreError('rate_limited', 'Rate limit exceeded', 429);
+          throw new AgentScoreError('rate_limited', 'Rate limit exceeded', 429);
+        } finally {
+          clearTimeout(retryTimer);
+        }
       }
 
       if (!response.ok) {
