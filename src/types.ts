@@ -282,7 +282,7 @@ export interface WalletSignerMismatchBody {
   /** Structured action guidance. Present when the merchant overrides the gate default with
    *  a custom `next_steps`. `action` may be any `NextStepsAction` — typically
    *  `resign_or_switch_to_operator_token` (gate default) or
-   *  `regenerate_payment_from_linked_wallet` (legacy merchant override). */
+   *  `regenerate_payment_from_linked_wallet` (a merchant-emitted alternative). */
   next_steps?: {
     action: NextStepsAction;
     user_message?: string;
@@ -306,7 +306,7 @@ export interface WalletAuthRequiresSigningBody {
   agent_instructions?: string;
   /** Structured action guidance. Present when the merchant overrides the gate default.
    *  `action` is typically `switch_to_operator_token` (gate default) or `use_operator_token`
-   *  (legacy merchant override). */
+   *  (a merchant-emitted alternative). */
   next_steps?: {
     action: NextStepsAction;
     user_message?: string;
