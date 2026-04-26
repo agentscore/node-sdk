@@ -18,6 +18,11 @@ import type {
 } from './types';
 
 export { AgentScoreError } from './errors';
+export {
+  verifyWebhookSignature,
+  type VerifyWebhookSignatureInput,
+  type VerifyWebhookSignatureResult,
+} from './webhooks';
 export * from './types';
 
 declare const __VERSION__: string;
