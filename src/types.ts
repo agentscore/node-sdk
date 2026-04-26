@@ -155,6 +155,11 @@ export interface AssessResponse {
   identity_method: 'wallet' | 'operator_token';
   operator_verification?: OperatorVerification;
   resolved_operator?: string | null;
+  /** Wallets linked to the same operator as the resolved identity. Populated on allow
+   *  responses; omitted on denials to avoid leaking the linked set for flagged operators.
+   *  Returned regardless of identity_method so agents can enumerate all wallets they could
+   *  sign with to satisfy a wallet-auth claim. Capped at 100 entries. */
+  linked_wallets?: string[];
   verify_url?: string;
   policy_result?: {
     all_passed: boolean;
@@ -183,6 +188,163 @@ export interface AgentScoreErrorBody {
     message: string;
     [key: string]: unknown;
   };
+  /** Cross-merchant pattern hint for agents to persist to memory. Present on bootstrap
+   *  denials (`operator_verification_required`) and session-create responses. */
+  agent_memory?: AgentMemoryHint;
+  /** JSON-encoded action copy (`{action, steps, user_message}`) emitted on every
+   *  gate denial so agents see a concrete recovery path in the response itself. Parse
+   *  as JSON; `action` will be a `NextStepsAction`. Absent on plain API errors. */
+  agent_instructions?: string;
+}
+
+/**
+ * Denial codes returned by the gate in 403/402 error bodies.
+ *
+ *   - `wallet_signer_mismatch`: X-Wallet-Address claimed, but the payment signer resolves to a
+ *     different operator (or isn't linked to any operator).
+ *   - `wallet_auth_requires_wallet_signing`: X-Wallet-Address claimed with a payment rail that
+ *     has no wallet signer (SPT, card). Agent should switch to X-Operator-Token.
+ *   - `token_expired`: operator token is no longer valid (revoked or past its TTL —
+ *     the two cases share this code deliberately so the API doesn't leak which one).
+ *     The 401 body carries an auto-minted session (`verify_url`, `session_id`, `poll_secret`)
+ *     so the agent can recover without an API key: share `verify_url` with the user, poll
+ *     until verified, receive a fresh operator_token. Existing account KYC persists.
+ */
+export type DenialCode =
+  | 'operator_verification_required'
+  | 'compliance_denied'
+  | 'compliance_error'
+  | 'wallet_not_trusted'
+  | 'missing_identity'
+  | 'identity_verification_required'
+  | 'payment_required'
+  | 'api_error'
+  | 'kyc_required'
+  | 'wallet_signer_mismatch'
+  | 'wallet_auth_requires_wallet_signing'
+  | 'token_expired';
+
+/**
+ * Recommended agent action encoded in `next_steps.action`. Granular codes let agents pick the
+ * right remediation (mint new credential vs. re-verify vs. switch identity path) without
+ * parsing natural-language `user_message`.
+ */
+export type NextStepsAction =
+  | 'poll_for_credential'
+  | 'contact_support'
+  | 'retry'
+  | 'retry_once_then_contact_support'
+  | 'regenerate_payment_credential'
+  | 'none'
+  | 'done'
+  | 'use_operator_token'
+  | 'regenerate_payment_from_linked_wallet'
+  // Gate-emitted probe strategy: try wallet on signing rails, fall back to stored
+  // opc_..., fall back to session flow. Emitted on bare missing_identity 403s.
+  | 'probe_identity_then_session'
+  // Wallet signer mismatch: re-sign from expected_signer / any linked_wallets entry,
+  // or drop X-Wallet-Address and retry with X-Operator-Token.
+  | 'resign_or_switch_to_operator_token'
+  // Non-signing rail (Stripe SPT, card): X-Wallet-Address has no signature to verify.
+  // Drop the wallet header and use X-Operator-Token.
+  | 'switch_to_operator_token'
+  // Session creation success — deliver verify_url to the user and poll poll_url until
+  // operator_token issues. Emitted on POST /v1/sessions.
+  | 'deliver_verify_url_and_poll'
+  // Session poll states.
+  | 'continue_polling'
+  | 'retry_merchant_request_with_operator_token'
+  | 'use_stored_operator_token'
+  | 'create_new_session'
+  | 'verification_failed'
+  | 'complete_kyc_then_retry';
+
+/**
+ * Error body shape for `wallet_signer_mismatch` denials. The claimed wallet's operator
+ * doesn't match the signer's operator. `actual_signer_operator` is null when the signer isn't
+ * linked to any operator (treat as a different identity). `linked_wallets` lists the wallets the
+ * agent could sign with to satisfy the claim.
+ */
+export interface WalletSignerMismatchBody {
+  error: {
+    code: 'wallet_signer_mismatch';
+    message: string;
+  };
+  claimed_operator: string;
+  actual_signer_operator: string | null;
+  expected_signer?: string;
+  actual_signer?: string;
+  linked_wallets: string[];
+  /** JSON-encoded `{action: 'resign_or_switch_to_operator_token', steps, user_message}`.
+   *  Present when the merchant uses the gate's default denial marshaller. Merchants that
+   *  override with their own `next_steps` may emit that instead — parse whichever is present. */
+  agent_instructions?: string;
+  /** Structured action guidance. Present when the merchant overrides the gate default with
+   *  a custom `next_steps`. `action` may be any `NextStepsAction` — typically
+   *  `resign_or_switch_to_operator_token` (gate default) or
+   *  `regenerate_payment_from_linked_wallet` (legacy merchant override). */
+  next_steps?: {
+    action: NextStepsAction;
+    user_message?: string;
+    learn_more_url?: string;
+  };
+  agent_memory?: AgentMemoryHint;
+}
+
+/**
+ * Error body for `wallet_auth_requires_wallet_signing` denials. Fired when
+ * `X-Wallet-Address` is combined with a payment rail that has no wallet signer (SPT, card).
+ * The agent should switch to `X-Operator-Token` to use those rails.
+ */
+export interface WalletAuthRequiresSigningBody {
+  error: {
+    code: 'wallet_auth_requires_wallet_signing';
+    message: string;
+  };
+  /** JSON-encoded `{action: 'switch_to_operator_token', steps, user_message}`. Present when
+   *  the merchant uses the gate's default denial marshaller. */
+  agent_instructions?: string;
+  /** Structured action guidance. Present when the merchant overrides the gate default.
+   *  `action` is typically `switch_to_operator_token` (gate default) or `use_operator_token`
+   *  (legacy merchant override). */
+  next_steps?: {
+    action: NextStepsAction;
+    user_message?: string;
+    /** Rails that carry a wallet signature and can be used under wallet-auth. */
+    signer_capable_rails?: string[];
+    learn_more_url?: string;
+  };
+  agent_memory?: AgentMemoryHint;
+}
+
+/**
+ * Identity-path guidance in the agent_memory payload. Tells agents which header to send on
+ * future AgentScore-gated endpoints based on the payment rail they plan to use.
+ */
+export interface AgentMemoryIdentityPaths {
+  wallet: string;
+  operator_token: string;
+}
+
+/**
+ * Structured hint emitted by AgentScore-gated endpoints on bootstrap denials
+ * (`operator_verification_required`) and `POST /v1/sessions` success responses. LLM-hosted
+ * agents should save this to their long-term memory so future AgentScore encounters skip the
+ * cold-start session flow.
+ *
+ * Contents are the pattern, not secrets. `do_not_persist_in_memory` names bearer credentials
+ * that belong in a credential store, not an LLM memory.
+ */
+export interface AgentMemoryHint {
+  save_for_future_agentscore_gates: true;
+  pattern_summary: string;
+  quickstart: string;
+  identity_check_endpoint: string;
+  list_wallets_endpoint?: string;
+  identity_paths: AgentMemoryIdentityPaths;
+  bootstrap: string;
+  do_not_persist_in_memory: string[];
+  persist_in_credential_store: string[];
 }
 
 export interface GetReputationOptions {
@@ -207,10 +369,21 @@ export interface SessionCreateResponse {
   verify_url: string;
   poll_url: string;
   expires_at: string;
+  /** Structured `next_steps.action: 'deliver_verify_url_and_poll'` with step-by-step
+   *  instructions for consuming the session. */
+  next_steps?: {
+    action: NextStepsAction;
+    poll_interval_seconds?: number;
+    poll_secret_header?: string;
+    steps?: string[];
+    user_message?: string;
+  };
+  /** Cross-merchant memory hint for agents on first session creation. */
+  agent_memory?: AgentMemoryHint;
 }
 
 export interface SessionPollNextSteps {
-  action: string;
+  action: NextStepsAction;
   user_message?: string;
   header_name?: string;
   poll_interval_seconds?: number;
@@ -240,9 +413,10 @@ export interface CredentialCreateResponse {
   id: string;
   credential: string;
   prefix: string;
-  label: string;
+  label: string | null;
   expires_at: string;
   created_at: string;
+  agent_memory?: AgentMemoryHint;
 }
 
 export interface CredentialCreateErrorResponse {
@@ -252,7 +426,7 @@ export interface CredentialCreateErrorResponse {
   };
   verify_url: string;
   next_steps: {
-    action: string;
+    action: NextStepsAction;
     user_message: string;
   };
 }
@@ -260,8 +434,8 @@ export interface CredentialCreateErrorResponse {
 export interface CredentialListItem {
   id: string;
   prefix: string;
-  label: string;
-  expires_at: string;
+  label: string | null;
+  expires_at: string | null;
   last_used_at: string | null;
   created_at: string;
 }
@@ -307,4 +481,8 @@ export interface AssociateWalletResponse {
   first_seen: boolean;
   /** Present and `true` when the call was deduped against a prior matching `idempotency_key`. */
   deduped?: boolean;
+  /** Cross-merchant pattern hint. Emitted only on the first wallet capture (`first_seen: true`)
+   *  so merchants can relay it once in a 402 body and LLM-hosted agents persist the pattern
+   *  to long-term memory. Absent on all subsequent captures. */
+  agent_memory?: AgentMemoryHint;
 }

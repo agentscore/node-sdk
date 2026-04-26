@@ -59,12 +59,13 @@ console.log(result.decision); // "allow" | "deny"
 
 ### Verification Sessions
 
-Bootstrap identity for first-time agents:
+Bootstrap identity for first-time agents. The success body carries structured `next_steps` (with `action: "deliver_verify_url_and_poll"`) and a cross-merchant `agent_memory` hint. Poll responses carry `next_steps.action` from the typed `NextStepsAction` union (`continue_polling`, `retry_merchant_request_with_operator_token`, `use_stored_operator_token`, `create_new_session`, `verification_failed`, `contact_support`).
 
 ```typescript
 // Create a session — returns a verify_url for the user and a poll_url for the agent
 const session = await client.createSession();
 console.log(session.verify_url, session.poll_url, session.poll_secret);
+console.log(session.next_steps.action); // "deliver_verify_url_and_poll"
 
 // Poll until the user completes verification
 const status = await client.pollSession(session.session_id, session.poll_secret);
@@ -72,6 +73,10 @@ if (status.status === "verified") {
   console.log(status.operator_token); // "opc_..." — use for future requests
 }
 ```
+
+### Wallet resolution
+
+`assess()` responses include `resolved_operator` and `linked_wallets[]` — all same-operator sibling wallets (claimed via SIWE or captured via prior `associateWallet`). The list may mix EVM addresses (`0x...` lowercased) and Solana addresses (base58, case-preserved) for cross-chain operators; merchants doing wallet-signer-match checks should accept a payment signed by any address in the list, regardless of chain. The `address` parameter on `assess()` and `getReputation()` accepts either format — network is auto-detected from the address shape.
 
 ### Credential Management
 
@@ -97,6 +102,23 @@ await client.associateWallet({
   idempotencyKey: paymentIntentId, // optional — agent retries of the same payment no-op
 });
 ```
+
+### Verify webhook signatures
+
+For merchants who receive HMAC-signed webhooks (Stripe-pattern `t=<unix>,v1=<hex>` header):
+
+```typescript
+import { verifyWebhookSignature } from "@agent-score/sdk";
+
+const result = verifyWebhookSignature({
+  payload: rawRequestBody,                 // raw Buffer or string — capture before any JSON parse
+  signatureHeader: req.header("x-agentscore-signature") ?? "",
+  secret: process.env.AGENTSCORE_WEBHOOK_SECRET!,
+});
+if (!result.valid) return res.status(400).json({ error: result.reason });
+```
+
+`reason` distinguishes transient (`timestamp_too_old`, `timestamp_in_future`) from permanent (`signature_mismatch`, `no_signatures`, `malformed_header`) failures. Default tolerance 300s; pass `toleranceSeconds: 0` to skip timestamp checking for raw HMAC use cases.
 
 ## Configuration
 
