@@ -13,7 +13,7 @@ import type {
 // body types. Runtime assertions exist only to give vitest something to execute; the real
 // verification is that the file type-checks.
 
-describe('1.9.0 types', () => {
+describe('wallet-auth hardening types', () => {
   it('accepts all new DenialCode values', () => {
     const codes: DenialCode[] = [
       'operator_verification_required',
@@ -36,7 +36,7 @@ describe('1.9.0 types', () => {
       'continue_polling',
       'retry_merchant_request_with_operator_token',
       'use_stored_operator_token',
-      // Backward-compat: pre-1.9.0 actions still present.
+      // Backward-compat: prior actions still present.
       'use_operator_token',
       'regenerate_payment_from_linked_wallet',
       'poll_for_credential',
