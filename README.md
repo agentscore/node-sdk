@@ -72,6 +72,11 @@ const status = await client.pollSession(session.session_id, session.poll_secret)
 if (status.status === "verified") {
   console.log(status.operator_token); // "opc_..." — use for future requests
 }
+
+// Optional pre-association: attach the session to a known wallet or refresh KYC
+// for an existing operator credential.
+await client.createSession({ address: "0x..." });
+await client.createSession({ operator_token: "opc_..." }); // KYC refresh
 ```
 
 ### Wallet resolution
@@ -122,6 +127,23 @@ try {
 } catch (err) {
   if (err instanceof AgentScoreError) {
     console.error(err.code, err.message, err.status);
+  }
+}
+```
+
+`AgentScoreError.details` carries the rest of the response body — `verify_url`, `linked_wallets`, `claimed_operator`, `actual_signer`, `expected_signer`, `reasons`, `agent_memory` — so callers can branch on granular denial codes without re-parsing:
+
+```typescript
+try {
+  await client.assess("0xabc...", { policy: { require_kyc: true } });
+} catch (err) {
+  if (!(err instanceof AgentScoreError)) throw err;
+  if (err.code === "wallet_signer_mismatch") {
+    const linked = err.details.linked_wallets as string[] | undefined;
+    console.log("Re-sign from one of:", linked);
+  }
+  if (err.code === "token_expired") {
+    console.log("Verify at:", err.details.verify_url);
   }
 }
 ```
