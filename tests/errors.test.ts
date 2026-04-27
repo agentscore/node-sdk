@@ -31,4 +31,19 @@ describe('AgentScoreError', () => {
     const err = new AgentScoreError('rate_limited', 'Too many requests', 429);
     expect(err.message).toBe('Too many requests');
   });
+
+  it('defaults details to an empty object when omitted', () => {
+    const err = new AgentScoreError('not_found', 'Not found', 404);
+    expect(err.details).toEqual({});
+  });
+
+  it('preserves response-body fields beyond {code, message} for granular recovery', () => {
+    const err = new AgentScoreError('wallet_signer_mismatch', 'Signer mismatch', 403, {
+      claimed_operator: 'op_abc',
+      actual_signer: '0xdef',
+      linked_wallets: ['0xabc', '0xdef'],
+    });
+    expect(err.details.claimed_operator).toBe('op_abc');
+    expect(err.details.linked_wallets).toEqual(['0xabc', '0xdef']);
+  });
 });

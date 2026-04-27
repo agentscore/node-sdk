@@ -80,6 +80,8 @@ export class AgentScore {
     const body: Record<string, unknown> = {};
     if (options?.context) body.context = options.context;
     if (options?.product_name) body.product_name = options.product_name;
+    if (options?.address) body.address = options.address;
+    if (options?.operator_token) body.operator_token = options.operator_token;
 
     return this.request<SessionCreateResponse>('/v1/sessions', {
       method: 'POST',
@@ -192,18 +194,23 @@ export class AgentScore {
       if (!response.ok) {
         let code = 'unknown_error';
         let message = `Request failed with status ${response.status}`;
+        let details: Record<string, unknown> = {};
 
         try {
-          const body = (await response.json()) as AgentScoreErrorBody;
+          const body = (await response.json()) as AgentScoreErrorBody & Record<string, unknown>;
           if (body?.error) {
             code = body.error.code;
             message = body.error.message;
           }
+          // Preserve everything except the parsed `error` block so consumers can read
+          // verify_url, linked_wallets, reasons, etc. for granular denial recovery.
+          const { error: _omit, ...rest } = body;
+          details = rest;
         } catch {
           // Use defaults
         }
 
-        throw new AgentScoreError(code, message, response.status);
+        throw new AgentScoreError(code, message, response.status, details);
       }
 
       return (await response.json()) as T;

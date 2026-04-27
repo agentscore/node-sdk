@@ -367,6 +367,10 @@ export interface AssessOptions {
 export interface SessionCreateOptions {
   context?: string;
   product_name?: string;
+  /** Pre-associate the session with a known wallet (EVM `0x...` or Solana base58). */
+  address?: string;
+  /** Pre-associate the session with an existing operator credential — e.g. refresh KYC for an `opc_...`. */
+  operator_token?: string;
 }
 
 export interface SessionCreateNextSteps {
