@@ -103,23 +103,6 @@ await client.associateWallet({
 });
 ```
 
-### Verify webhook signatures
-
-For merchants who receive HMAC-signed webhooks (Stripe-pattern `t=<unix>,v1=<hex>` header):
-
-```typescript
-import { verifyWebhookSignature } from "@agent-score/sdk";
-
-const result = verifyWebhookSignature({
-  payload: rawRequestBody,                 // raw Buffer or string — capture before any JSON parse
-  signatureHeader: req.header("x-agentscore-signature") ?? "",
-  secret: process.env.AGENTSCORE_WEBHOOK_SECRET!,
-});
-if (!result.valid) return res.status(400).json({ error: result.reason });
-```
-
-`reason` distinguishes transient (`timestamp_too_old`, `timestamp_in_future`) from permanent (`signature_mismatch`, `no_signatures`, `malformed_header`) failures. Default tolerance 300s; pass `toleranceSeconds: 0` to skip timestamp checking for raw HMAC use cases.
-
 ## Configuration
 
 | Option      | Type     | Default                     | Description              |
