@@ -149,6 +149,27 @@ export interface AssessRequest {
   policy?: DecisionPolicy;
 }
 
+export interface PolicyCheck {
+  rule: string;
+  passed: boolean;
+  required?: unknown;
+  actual?: unknown;
+}
+
+export interface PolicyResult {
+  all_passed: boolean;
+  checks: PolicyCheck[];
+}
+
+export interface PolicyExplanation {
+  rule: string;
+  passed: boolean;
+  required: unknown;
+  actual: unknown;
+  message: string;
+  how_to_remedy: string | null;
+}
+
 export interface AssessResponse {
   decision: string | null;
   decision_reasons: string[];
@@ -161,25 +182,10 @@ export interface AssessResponse {
    *  sign with to satisfy a wallet-auth claim. Capped at 100 entries. */
   linked_wallets?: string[];
   verify_url?: string;
-  policy_result?: {
-    all_passed: boolean;
-    checks: Array<{
-      rule: string;
-      passed: boolean;
-      required?: unknown;
-      actual?: unknown;
-    }>;
-  } | null;
+  policy_result?: PolicyResult | null;
   on_the_fly: boolean;
   updated_at: string | null;
-  explanation?: Array<{
-    rule: string;
-    passed: boolean;
-    required: unknown;
-    actual: unknown;
-    message: string;
-    how_to_remedy: string | null;
-  }>;
+  explanation?: PolicyExplanation[];
 }
 
 export interface AgentScoreErrorBody {
@@ -363,6 +369,14 @@ export interface SessionCreateOptions {
   product_name?: string;
 }
 
+export interface SessionCreateNextSteps {
+  action: NextStepsAction;
+  poll_interval_seconds?: number;
+  poll_secret_header?: string;
+  steps?: string[];
+  user_message?: string;
+}
+
 export interface SessionCreateResponse {
   session_id: string;
   poll_secret: string;
@@ -371,13 +385,7 @@ export interface SessionCreateResponse {
   expires_at: string;
   /** Structured `next_steps.action: 'deliver_verify_url_and_poll'` with step-by-step
    *  instructions for consuming the session. */
-  next_steps?: {
-    action: NextStepsAction;
-    poll_interval_seconds?: number;
-    poll_secret_header?: string;
-    steps?: string[];
-    user_message?: string;
-  };
+  next_steps?: SessionCreateNextSteps;
   /** Cross-merchant memory hint for agents on first session creation. */
   agent_memory?: AgentMemoryHint;
 }
@@ -419,19 +427,21 @@ export interface CredentialCreateResponse {
   agent_memory?: AgentMemoryHint;
 }
 
+export interface CredentialCreateErrorNextSteps {
+  action: NextStepsAction;
+  user_message: string;
+}
+
 export interface CredentialCreateErrorResponse {
   error: {
     code: 'kyc_required';
     message: string;
   };
   verify_url: string;
-  next_steps: {
-    action: NextStepsAction;
-    user_message: string;
-  };
+  next_steps: CredentialCreateErrorNextSteps;
 }
 
-export interface CredentialListItem {
+export interface CredentialItem {
   id: string;
   prefix: string;
   label: string | null;
@@ -451,7 +461,7 @@ export interface AccountVerification {
 }
 
 export interface CredentialListResponse {
-  credentials: CredentialListItem[];
+  credentials: CredentialItem[];
   account_verification: AccountVerification;
 }
 
@@ -460,15 +470,18 @@ export interface CredentialRevokeResponse {
   revoked: true;
 }
 
+/** Key-derivation family. EVM EOAs share identity across every EVM chain (Base, Tempo,
+ *  Ethereum, …) so `'evm'` covers them all. Use `'solana'` for Solana addresses. */
+export type Network = 'evm' | 'solana';
+
 export interface AssociateWalletOptions {
   /** Operator credential (opc_...) that the agent authenticated with on the gated endpoint. */
   operatorToken: string;
   /** The signer wallet recovered from the payment payload — EVM `from` from EIP-3009 for x402,
    *  the `did:pkh` address for Tempo MPP, or a Solana base58 pubkey. */
   walletAddress: string;
-  /** Key-derivation family. EVM EOAs share identity across every EVM chain (Base, Tempo,
-   *  Ethereum, …) so `"evm"` covers them all. Use `"solana"` for Solana addresses. */
-  network: 'evm' | 'solana';
+  /** Key-derivation family — see {@link Network}. */
+  network: Network;
   /** Optional stable key for the logical payment (e.g., Stripe PI id, x402 tx hash). When the
    *  same key is seen again for the same (credential, wallet, network), the server no-ops —
    *  `transaction_count` isn't inflated by agent retries. */
