@@ -18,6 +18,7 @@ import type {
 } from './types';
 
 export { AgentScoreError } from './errors';
+export { AGENTSCORE_TEST_ADDRESSES, isAgentScoreTestAddress } from './test-mode';
 export * from './types';
 
 declare const __VERSION__: string;
@@ -74,6 +75,8 @@ export class AgentScore {
     const body: Record<string, unknown> = {};
     if (options?.context) body.context = options.context;
     if (options?.product_name) body.product_name = options.product_name;
+    if (options?.address) body.address = options.address;
+    if (options?.operator_token) body.operator_token = options.operator_token;
 
     return this.request<SessionCreateResponse>('/v1/sessions', {
       method: 'POST',
@@ -168,27 +171,41 @@ export class AgentScore {
         const waitMs = retryAfter ? Number(retryAfter) * 1000 : 1000;
         await new Promise((resolve) => setTimeout(resolve, Math.min(waitMs, 10_000)));
 
-        const retry = await fetch(url, { ...options, headers, signal });
-        if (retry.ok) return (await retry.json()) as T;
+        // Fresh controller for the retry. Reusing the original signal would let a stale
+        // timeout abort the retry mid-flight (the original timer keeps running while we
+        // wait retry-after, and may already have fired by the time the retry starts).
+        const retryController = new AbortController();
+        const retryTimer = setTimeout(() => retryController.abort(), this.timeout);
+        try {
+          const retry = await fetch(url, { ...options, headers, signal: retryController.signal });
+          if (retry.ok) return (await retry.json()) as T;
 
-        throw new AgentScoreError('rate_limited', 'Rate limit exceeded', 429);
+          throw new AgentScoreError('rate_limited', 'Rate limit exceeded', 429);
+        } finally {
+          clearTimeout(retryTimer);
+        }
       }
 
       if (!response.ok) {
         let code = 'unknown_error';
         let message = `Request failed with status ${response.status}`;
+        let details: Record<string, unknown> = {};
 
         try {
-          const body = (await response.json()) as AgentScoreErrorBody;
+          const body = (await response.json()) as AgentScoreErrorBody & Record<string, unknown>;
           if (body?.error) {
             code = body.error.code;
             message = body.error.message;
           }
+          // Preserve everything except the parsed `error` block so consumers can read
+          // verify_url, linked_wallets, reasons, etc. for granular denial recovery.
+          const { error: _omit, ...rest } = body;
+          details = rest;
         } catch {
           // Use defaults
         }
 
-        throw new AgentScoreError(code, message, response.status);
+        throw new AgentScoreError(code, message, response.status, details);
       }
 
       return (await response.json()) as T;

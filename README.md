@@ -59,19 +59,29 @@ console.log(result.decision); // "allow" | "deny"
 
 ### Verification Sessions
 
-Bootstrap identity for first-time agents:
+Bootstrap identity for first-time agents. The success body carries structured `next_steps` (with `action: "deliver_verify_url_and_poll"`) and a cross-merchant `agent_memory` hint. Poll responses carry `next_steps.action` from the typed `NextStepsAction` union (`continue_polling`, `retry_merchant_request_with_operator_token`, `use_stored_operator_token`, `create_new_session`, `verification_failed`, `contact_support`).
 
 ```typescript
 // Create a session — returns a verify_url for the user and a poll_url for the agent
 const session = await client.createSession();
 console.log(session.verify_url, session.poll_url, session.poll_secret);
+console.log(session.next_steps.action); // "deliver_verify_url_and_poll"
 
 // Poll until the user completes verification
 const status = await client.pollSession(session.session_id, session.poll_secret);
 if (status.status === "verified") {
   console.log(status.operator_token); // "opc_..." — use for future requests
 }
+
+// Optional pre-association: attach the session to a known wallet or refresh KYC
+// for an existing operator credential.
+await client.createSession({ address: "0x..." });
+await client.createSession({ operator_token: "opc_..." }); // KYC refresh
 ```
+
+### Wallet resolution
+
+`assess()` responses include `resolved_operator` and `linked_wallets[]` — all same-operator sibling wallets (claimed via SIWE or captured via prior `associateWallet`). The list may mix EVM addresses (`0x...` lowercased) and Solana addresses (base58, case-preserved) for cross-chain operators; merchants doing wallet-signer-match checks should accept a payment signed by any address in the list, regardless of chain. The `address` parameter on `assess()` and `getReputation()` accepts either format — network is auto-detected from the address shape.
 
 ### Credential Management
 
@@ -117,6 +127,23 @@ try {
 } catch (err) {
   if (err instanceof AgentScoreError) {
     console.error(err.code, err.message, err.status);
+  }
+}
+```
+
+`AgentScoreError.details` carries the rest of the response body — `verify_url`, `linked_wallets`, `claimed_operator`, `actual_signer`, `expected_signer`, `reasons`, `agent_memory` — so callers can branch on granular denial codes without re-parsing:
+
+```typescript
+try {
+  await client.assess("0xabc...", { policy: { require_kyc: true } });
+} catch (err) {
+  if (!(err instanceof AgentScoreError)) throw err;
+  if (err.code === "wallet_signer_mismatch") {
+    const linked = err.details.linked_wallets as string[] | undefined;
+    console.log("Re-sign from one of:", linked);
+  }
+  if (err.code === "token_expired") {
+    console.log("Verify at:", err.details.verify_url);
   }
 }
 ```

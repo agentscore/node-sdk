@@ -648,4 +648,37 @@ describe('AgentScore.assess() — operatorToken', () => {
     await expect(client.getReputation(WALLET)).rejects.toThrow(AgentScoreError);
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
+
+  it('aborts the retry when the retry timer fires', async () => {
+    let callCount = 0;
+    global.fetch = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+      callCount += 1;
+      if (callCount === 1) {
+        return Promise.resolve({
+          ok: false,
+          status: 429,
+          headers: new Headers({ 'retry-after': '0' }),
+          json: vi.fn().mockResolvedValueOnce({}),
+        } as unknown as Response);
+      }
+      return new Promise((_resolve, reject) => {
+        const signal = init.signal as AbortSignal;
+        signal.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted', 'AbortError'));
+        });
+      });
+    });
+
+    const client = new AgentScore({ apiKey: API_KEY, timeout: 10 });
+
+    try {
+      await client.getReputation(WALLET);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(AgentScoreError);
+      const err = e as AgentScoreError;
+      expect(err.code).toBe('timeout');
+    }
+    expect(callCount).toBe(2);
+  });
 });
