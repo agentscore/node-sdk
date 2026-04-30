@@ -199,8 +199,8 @@ describe('AgentScore.pollSession()', () => {
 
 const CREDENTIAL_CREATE_RESPONSE = {
   id: 'cred_abc123',
-  credential: 'opc_live_abc123def456',
-  prefix: 'opc_live_abc',
+  credential: 'opc_test_abc123def456',
+  prefix: 'opc_test_abc',
   label: 'Production API',
   expires_at: '2027-04-09T00:00:00Z',
   created_at: '2026-04-09T00:00:00Z',
@@ -288,7 +288,7 @@ const CREDENTIAL_LIST_RESPONSE = {
   credentials: [
     {
       id: 'cred_abc123',
-      prefix: 'opc_live_abc',
+      prefix: 'opc_test_abc',
       label: 'Production API',
       expires_at: '2027-04-09T00:00:00Z',
       last_used_at: '2026-04-08T12:00:00Z',
@@ -296,7 +296,7 @@ const CREDENTIAL_LIST_RESPONSE = {
     },
     {
       id: 'cred_def456',
-      prefix: 'opc_live_def',
+      prefix: 'opc_test_def',
       label: 'Staging',
       expires_at: '2026-05-01T00:00:00Z',
       last_used_at: null,

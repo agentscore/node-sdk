@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@agent-score/sdk.svg)](https://www.npmjs.com/package/@agent-score/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-TypeScript/Node.js client for the [AgentScore](https://agentscore.sh) trust and reputation API.
+TypeScript/Node.js client for the [AgentScore](https://agentscore.sh) APIs.
 
 ## Install
 

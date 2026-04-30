@@ -12,7 +12,11 @@ export type ReputationStatus = 'scored' | 'stale' | 'known_unscored';
 
 export interface Subject {
   chains: string[];
-  address: string;
+  /** Wallet-based subject. Present for assess/reputation responses keyed by `address`.
+   *  Absent on credential-based assess (use `credential_prefix` instead). */
+  address?: string;
+  /** Credential-based subject. Present for assess responses keyed by `operator_token`. */
+  credential_prefix?: string;
 }
 
 export interface Classification {
@@ -217,18 +221,25 @@ export interface AgentScoreErrorBody {
  *     until verified, receive a fresh operator_token. Existing account KYC persists.
  */
 export type DenialCode =
+  // Gate-emitted codes from commerce middleware (canonical 9-element union)
+  | 'missing_identity'
+  | 'identity_verification_required'
+  | 'token_expired'
+  | 'invalid_credential'
+  | 'wallet_signer_mismatch'
+  | 'wallet_auth_requires_wallet_signing'
+  | 'wallet_not_trusted'
+  | 'api_error'
+  | 'payment_required'
+  // Merchant-emitted convenience codes (e.g. martin-estate's onDenied wraps gate denials
+  // into wine-specific business codes). These are not emitted by the AgentScore API
+  // itself but appear in 4xx bodies the SDK may surface back to callers.
   | 'operator_verification_required'
   | 'compliance_denied'
   | 'compliance_error'
-  | 'wallet_not_trusted'
-  | 'missing_identity'
-  | 'identity_verification_required'
-  | 'payment_required'
-  | 'api_error'
-  | 'kyc_required'
-  | 'wallet_signer_mismatch'
-  | 'wallet_auth_requires_wallet_signing'
-  | 'token_expired';
+  // Decision-reason code surfaced in error.code by some merchants — kept for back-compat
+  // with merchants that flatten policy reasons into the error envelope.
+  | 'kyc_required';
 
 /**
  * Recommended agent action encoded in `next_steps.action`. Granular codes let agents pick the
@@ -466,7 +477,10 @@ export interface AccountVerification {
 
 export interface CredentialListResponse {
   credentials: CredentialItem[];
-  account_verification: AccountVerification;
+  /** Account-level KYC facts. Conditionally emitted by the API — only present when the
+   *  account has an associated `account_verifications` row. Absent for accounts that
+   *  have minted credentials but never started KYC. */
+  account_verification?: AccountVerification;
 }
 
 export interface CredentialRevokeResponse {

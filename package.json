@@ -1,7 +1,7 @@
 {
   "name": "@agent-score/sdk",
-  "version": "2.0.0",
-  "description": "TypeScript client for the AgentScore trust and reputation API",
+  "version": "2.1.0",
+  "description": "TypeScript client for the AgentScore APIs",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -48,7 +48,7 @@
     "url": "https://github.com/agentscore/node-sdk/issues"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

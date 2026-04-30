@@ -1,6 +1,6 @@
 # @agent-score/sdk
 
-TypeScript client for the AgentScore trust and reputation API.
+TypeScript client for the AgentScore APIs.
 
 ## Identity Model
 
