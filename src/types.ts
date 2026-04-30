@@ -231,9 +231,9 @@ export type DenialCode =
   | 'wallet_not_trusted'
   | 'api_error'
   | 'payment_required'
-  // Merchant-emitted convenience codes (e.g. martin-estate's onDenied wraps gate denials
-  // into wine-specific business codes). These are not emitted by the AgentScore API
-  // itself but appear in 4xx bodies the SDK may surface back to callers.
+  // Merchant-emitted convenience codes — not emitted by the AgentScore API itself,
+  // but they may appear in 4xx bodies that pass through the SDK from merchants whose
+  // gate `onDenied` hook wraps AgentScore denials into business-domain codes.
   | 'operator_verification_required'
   | 'compliance_denied'
   | 'compliance_error'
