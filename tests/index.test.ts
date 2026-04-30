@@ -518,7 +518,7 @@ describe('Integration: compliance policy deny with verify_url', () => {
         evidence_summary: { metadata_kind: null, has_a2a_agent_card: false, website_url: null, website_reachable: false, website_mentions_mcp: false, website_mentions_x402: false, github_url: null, github_stars: null },
       }],
       decision: 'deny',
-      decision_reasons: ['kyc_required', 'sanctions_check_pending'],
+      decision_reasons: ['kyc_required', 'sanctions_flagged'],
       on_the_fly: false,
       data_semantics: 'v1',
       caveats: [],
@@ -544,7 +544,7 @@ describe('Integration: compliance policy deny with verify_url', () => {
 
     expect(result.decision).toBe('deny');
     expect(result.decision_reasons).toContain('kyc_required');
-    expect(result.decision_reasons).toContain('sanctions_check_pending');
+    expect(result.decision_reasons).toContain('sanctions_flagged');
     expect(result.verify_url).toBe('https://agentscore.sh/verify/xyz789');
     expect(result.operator_verification).toBeDefined();
     expect(result.operator_verification!.level).toBe('none');
