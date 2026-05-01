@@ -118,8 +118,8 @@ export class AgentScore {
   }
 
   /**
-   * Report that a wallet paid under an operator credential. Paid-tier merchants observing
-   * agent payments call this passively to build a cross-merchant credential↔wallet profile.
+   * Report that a wallet paid under an operator credential. Merchants observing agent
+   * payments call this passively to build a cross-merchant credential↔wallet profile.
    *
    * Fire-and-forget friendly — the returned `first_seen` boolean is informational only.
    */
