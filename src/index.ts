@@ -80,6 +80,7 @@ export class AgentScore {
     if (options?.chain) body.chain = options.chain;
     if (options?.refresh !== undefined) body.refresh = options.refresh;
     if (options?.policy) body.policy = options.policy;
+    if (options?.resolveSigner) body.resolve_signer = options.resolveSigner;
 
     const { data, headers } = await this.requestWithHeaders<AssessResponse>('/v1/assess', {
       method: 'POST',
@@ -173,7 +174,7 @@ export class AgentScore {
     claimed_wallet?: string;
     signer?: string | null;
     network?: 'evm' | 'solana';
-    kind: 'pass' | 'wallet_signer_mismatch' | 'wallet_auth_requires_wallet_signing';
+    kind: 'pass' | 'wallet_signer_mismatch' | 'wallet_auth_requires_wallet_signing' | 'api_error';
     [key: string]: unknown;
   }): Promise<void> {
     try {
@@ -247,7 +248,13 @@ export class AgentScore {
     } catch (err) {
       if (err instanceof AgentScoreError) throw err;
       const message = err instanceof Error ? err.message : 'Unknown error';
-      if (signal.aborted) throw new TimeoutError(message);
+      // Detect timeouts via either: (a) the AbortSignal we attached fired (real timeout),
+      // (b) the thrown Error.name is 'AbortError' or 'TimeoutError' (some fetch impls /
+      // test mocks throw with these names directly without firing the signal).
+      const errName = err instanceof Error ? err.name : '';
+      if (signal.aborted || errName === 'AbortError' || errName === 'TimeoutError') {
+        throw new TimeoutError(message);
+      }
       throw new AgentScoreError('network_error', message, 0);
     } finally {
       clearTimeout(timer);

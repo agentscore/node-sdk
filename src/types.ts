@@ -146,11 +146,56 @@ export interface DecisionPolicy {
   allowed_jurisdictions?: string[];
 }
 
+/** Server-side wallet-signer-match request. When present in `AssessRequest.resolve_signer`,
+ *  the API resolves this wallet against the claimed `address` and emits a `signer_match`
+ *  block on the response. Lets commerce gates collapse the legacy 2 follow-up assess
+ *  calls (one per wallet) into the gate's primary assess call. Strictly additive — old
+ *  clients that don't send this field see no `signer_match` on the response. */
+export interface ResolveSigner {
+  /** Recovered payment-signer wallet. `null` indicates the rail carries no wallet
+   *  signature (Stripe SPT, card) — produces `signer_match.kind = "wallet_auth_requires_wallet_signing"`. */
+  address: string | null;
+  /** Key-derivation family of the signer wallet. */
+  network: 'evm' | 'solana';
+}
+
+/** Server-side wallet-signer-match verdict. Emitted on `AssessResponse.signer_match` when
+ *  the request supplied `resolve_signer`. Mirrors the verdict shape commerce SDK gates
+ *  produce locally; SDK consumers spread this into 403 bodies verbatim instead of
+ *  re-deriving via 2 extra `/v1/assess` round trips. */
+export interface SignerMatch {
+  /** `pass` — claimed wallet and signer wallet resolve to the same operator (or are
+   *  byte-equal). `wallet_signer_mismatch` — operators differ.
+   *  `wallet_auth_requires_wallet_signing` — request supplied `address: null` (rail has
+   *  no wallet signer); agent should switch to operator_token auth. */
+  kind: 'pass' | 'wallet_signer_mismatch' | 'wallet_auth_requires_wallet_signing';
+  /** Operator the claimed wallet resolves to. `null` if unlinked. */
+  claimed_operator?: string | null;
+  /** Operator the signer wallet resolves to. `null` if unlinked. */
+  signer_operator?: string | null;
+  /** Echoed only on `wallet_auth_requires_wallet_signing` — the claimed wallet from the
+   *  request. Helps agents construct the recovery message. */
+  claimed_wallet?: string;
+  /** Echoed on `wallet_signer_mismatch` — the claimed wallet, normalized. */
+  expected_signer?: string;
+  /** Echoed on `wallet_signer_mismatch` — the signer wallet, normalized. */
+  actual_signer?: string;
+  /** Same-operator linked wallets the agent could re-sign from to satisfy the claim.
+   *  Mirrors the top-level `linked_wallets` deny-guard — omitted on `deny` verdicts. */
+  linked_wallets?: string[];
+  /** JSON-encoded `{action, steps, user_message}` envelope for SDK denial bodies.
+   *  Authoritative copy lives server-side; SDK consumers spread this into their 403
+   *  body without re-parsing. */
+  agent_instructions?: string;
+}
+
 export interface AssessRequest {
   address: string;
   chain?: string;
   refresh?: boolean;
   policy?: DecisionPolicy;
+  /** Optional server-side wallet-signer-match. See {@link ResolveSigner}. */
+  resolve_signer?: ResolveSigner;
 }
 
 export interface PolicyCheck {
@@ -200,9 +245,10 @@ export interface AssessResponse {
   linked_wallets?: string[];
   verify_url?: string;
   policy_result?: PolicyResult | null;
-  on_the_fly: boolean;
-  updated_at: string | null;
   explanation?: PolicyExplanation[];
+  /** Server-side wallet-signer-match verdict, returned only when the request supplied
+   *  `resolve_signer`. Empty otherwise. */
+  signer_match?: SignerMatch;
   /** Quota state for this account, captured from response headers. Use it to monitor
    *  approach-to-cap proactively (e.g. warn at 80%, alert at 95%) before hitting a 429. */
   quota?: QuotaInfo;
@@ -389,6 +435,9 @@ export interface AssessOptions {
   refresh?: boolean;
   policy?: DecisionPolicy;
   operatorToken?: string;
+  /** Optional server-side wallet-signer-match. Lets commerce gates collapse the legacy
+   *  2 follow-up assess calls into the gate's primary assess call. See {@link ResolveSigner}. */
+  resolveSigner?: ResolveSigner;
 }
 
 export interface SessionCreateOptions {
