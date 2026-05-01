@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AgentScore, AgentScoreError } from '../src/index';
+import {
+  AgentScore,
+  AgentScoreError,
+  InvalidCredentialError,
+  PaymentRequiredError,
+  QuotaExceededError,
+  RateLimitedError,
+  TimeoutError,
+  TokenExpiredError,
+} from '../src/index';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -16,11 +25,20 @@ function mockFetchOk(body: unknown): void {
   } as unknown as Response);
 }
 
-function mockFetchError(status: number, errorBody?: { error: { code: string; message: string } }): void {
+function mockFetchError(status: number, errorBody?: Record<string, unknown>): void {
   global.fetch = vi.fn().mockResolvedValueOnce({
     ok: false,
     status,
     json: vi.fn().mockResolvedValueOnce(errorBody ?? {}),
+  } as unknown as Response);
+}
+
+function mockFetchOkWithHeaders(body: unknown, headers: Record<string, string>): void {
+  global.fetch = vi.fn().mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: vi.fn().mockResolvedValueOnce(body),
+    headers: new Headers(headers),
   } as unknown as Response);
 }
 
@@ -680,5 +698,189 @@ describe('AgentScore.assess() — operatorToken', () => {
       expect(err.code).toBe('timeout');
     }
     expect(callCount).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Typed errors
+// ---------------------------------------------------------------------------
+
+describe('AgentScore typed errors', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('throws PaymentRequiredError on 402 (subclass of AgentScoreError)', async () => {
+    mockFetchError(402, { error: { code: 'payment_required', message: 'Endpoint not enabled' } });
+    const client = new AgentScore({ apiKey: API_KEY });
+    try {
+      await client.assess(WALLET);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(PaymentRequiredError);
+      expect(e).toBeInstanceOf(AgentScoreError);
+      const err = e as PaymentRequiredError;
+      expect(err.code).toBe('payment_required');
+      expect(err.status).toBe(402);
+    }
+  });
+
+  it('throws TokenExpiredError on 401 token_expired with parsed body fields exposed on the instance', async () => {
+    mockFetchError(401, {
+      error: { code: 'token_expired', message: 'Operator token expired' },
+      verify_url: 'https://agentscore.sh/verify/abc',
+      session_id: 'sess_123',
+      poll_secret: 'ps_456',
+      poll_url: 'https://api.agentscore.sh/v1/sessions/sess_123',
+      next_steps: { action: 'deliver_verify_url_and_poll' },
+      agent_memory: { pattern_summary: 'remembered' },
+    });
+    const client = new AgentScore({ apiKey: API_KEY });
+    try {
+      await client.assess(WALLET);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(TokenExpiredError);
+      const err = e as TokenExpiredError;
+      expect(err.code).toBe('token_expired');
+      expect(err.status).toBe(401);
+      expect(err.verifyUrl).toBe('https://agentscore.sh/verify/abc');
+      expect(err.sessionId).toBe('sess_123');
+      expect(err.pollSecret).toBe('ps_456');
+      expect(err.pollUrl).toBe('https://api.agentscore.sh/v1/sessions/sess_123');
+      expect(err.nextSteps).toEqual({ action: 'deliver_verify_url_and_poll' });
+    }
+  });
+
+  it('throws InvalidCredentialError on 401 invalid_credential', async () => {
+    mockFetchError(401, { error: { code: 'invalid_credential', message: 'Token unknown' } });
+    const client = new AgentScore({ apiKey: API_KEY });
+    await expect(client.assess(WALLET)).rejects.toBeInstanceOf(InvalidCredentialError);
+  });
+
+  it('throws QuotaExceededError on 429 quota_exceeded (after retry still fails)', async () => {
+    // Both initial + retry mocked as 429 quota_exceeded.
+    let callCount = 0;
+    global.fetch = vi.fn().mockImplementation(() => {
+      callCount += 1;
+      return Promise.resolve({
+        ok: false,
+        status: 429,
+        json: () => Promise.resolve({ error: { code: 'quota_exceeded', message: 'Account quota exceeded' } }),
+        headers: new Headers({ 'retry-after': '0' }),
+      } as unknown as Response);
+    });
+    const client = new AgentScore({ apiKey: API_KEY });
+    try {
+      await client.assess(WALLET);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(QuotaExceededError);
+      expect((e as QuotaExceededError).status).toBe(429);
+    }
+    expect(callCount).toBe(2);
+  });
+
+  it('throws RateLimitedError on 429 rate_limited (after retry still fails)', async () => {
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: false,
+        status: 429,
+        json: () => Promise.resolve({ error: { code: 'rate_limited', message: 'Per-second cap hit' } }),
+        headers: new Headers({ 'retry-after': '0' }),
+      } as unknown as Response),
+    );
+    const client = new AgentScore({ apiKey: API_KEY });
+    await expect(client.assess(WALLET)).rejects.toBeInstanceOf(RateLimitedError);
+  });
+
+  it('throws TimeoutError on AbortError (subclass of AgentScoreError)', async () => {
+    global.fetch = vi.fn().mockImplementation((_url, init: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        const signal = init.signal as AbortSignal;
+        signal.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted', 'AbortError'));
+        });
+      }),
+    );
+    const client = new AgentScore({ apiKey: API_KEY, timeout: 10 });
+    try {
+      await client.assess(WALLET);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(TimeoutError);
+      expect(e).toBeInstanceOf(AgentScoreError);
+      expect((e as TimeoutError).code).toBe('timeout');
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Quota header capture
+// ---------------------------------------------------------------------------
+
+describe('AgentScore.assess() — quota capture', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('attaches quota field to AssessResponse when X-Quota-* headers are present', async () => {
+    mockFetchOkWithHeaders(ASSESS_RESPONSE, {
+      'x-quota-limit': '1000',
+      'x-quota-used': '780',
+      'x-quota-reset': '2026-06-01T00:00:00Z',
+    });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const res = await client.assess(WALLET);
+    expect(res.quota).toEqual({ limit: 1000, used: 780, reset: '2026-06-01T00:00:00Z' });
+  });
+
+  it('omits quota field entirely when no X-Quota-* headers are present', async () => {
+    mockFetchOkWithHeaders(ASSESS_RESPONSE, {});
+    const client = new AgentScore({ apiKey: API_KEY });
+    const res = await client.assess(WALLET);
+    expect(res.quota).toBeUndefined();
+  });
+
+  it('handles "never" reset literal for unlimited tiers', async () => {
+    mockFetchOkWithHeaders(ASSESS_RESPONSE, {
+      'x-quota-limit': '0',
+      'x-quota-used': '0',
+      'x-quota-reset': 'never',
+    });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const res = await client.assess(WALLET);
+    expect(res.quota).toEqual({ limit: 0, used: 0, reset: 'never' });
+  });
+
+  it('falls back gracefully when headers are absent on the mock response', async () => {
+    // mockFetchOk produces a Response with no `headers` field at all — extractQuota
+    // must defend against that without crashing.
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    const res = await client.assess(WALLET);
+    expect(res.quota).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// telemetrySignerMatch
+// ---------------------------------------------------------------------------
+
+describe('AgentScore.telemetrySignerMatch()', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('posts to /v1/telemetry/signer-match with the supplied payload', async () => {
+    mockFetchOk({});
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.telemetrySignerMatch({ kind: 'pass', signer: '0xabc', network: 'evm' });
+    const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(fetchCall[0]).toContain('/v1/telemetry/signer-match');
+    expect(fetchCall[1].method).toBe('POST');
+    const body = JSON.parse(fetchCall[1].body as string);
+    expect(body).toEqual({ kind: 'pass', signer: '0xabc', network: 'evm' });
+  });
+
+  it('swallows errors silently (fire-and-forget)', async () => {
+    mockFetchError(500, { error: { code: 'internal_error', message: 'oops' } });
+    const client = new AgentScore({ apiKey: API_KEY });
+    // Should NOT throw.
+    await expect(client.telemetrySignerMatch({ kind: 'wallet_signer_mismatch' })).resolves.toBeUndefined();
   });
 });

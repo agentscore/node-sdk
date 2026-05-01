@@ -174,6 +174,19 @@ export interface PolicyExplanation {
   how_to_remedy: string | null;
 }
 
+/** Per-account assess quota observability, captured from `X-Quota-*` response headers on
+ *  the success path. Fields are `null` when the API didn't include the header (Enterprise
+ *  / unlimited tiers, or when the API is configured without a per-account quota). */
+export interface QuotaInfo {
+  /** `X-Quota-Limit` — total quota for the current period. */
+  limit: number | null;
+  /** `X-Quota-Used` — current usage within the period. */
+  used: number | null;
+  /** `X-Quota-Reset` — ISO-8601 timestamp when the period resets, or `'never'` for lifetime
+   *  caps. The API emits the literal string `'never'` for tiers without a reset. */
+  reset: string | null;
+}
+
 export interface AssessResponse {
   decision: string | null;
   decision_reasons: string[];
@@ -190,6 +203,9 @@ export interface AssessResponse {
   on_the_fly: boolean;
   updated_at: string | null;
   explanation?: PolicyExplanation[];
+  /** Quota state for this account, captured from response headers. Use it to monitor
+   *  approach-to-cap proactively (e.g. warn at 80%, alert at 95%) before hitting a 429. */
+  quota?: QuotaInfo;
 }
 
 export interface AgentScoreErrorBody {

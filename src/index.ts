@@ -1,4 +1,12 @@
-import { AgentScoreError } from './errors';
+import {
+  AgentScoreError,
+  InvalidCredentialError,
+  PaymentRequiredError,
+  QuotaExceededError,
+  RateLimitedError,
+  TimeoutError,
+  TokenExpiredError,
+} from './errors';
 import type {
   AgentScoreConfig,
   AgentScoreErrorBody,
@@ -11,13 +19,22 @@ import type {
   CredentialListResponse,
   CredentialRevokeResponse,
   GetReputationOptions,
+  QuotaInfo,
   ReputationResponse,
   SessionCreateOptions,
   SessionCreateResponse,
   SessionPollResponse,
 } from './types';
 
-export { AgentScoreError } from './errors';
+export {
+  AgentScoreError,
+  InvalidCredentialError,
+  PaymentRequiredError,
+  QuotaExceededError,
+  RateLimitedError,
+  TimeoutError,
+  TokenExpiredError,
+} from './errors';
 export { AGENTSCORE_TEST_ADDRESSES, isAgentScoreTestAddress } from './test-mode';
 export * from './types';
 
@@ -64,11 +81,13 @@ export class AgentScore {
     if (options?.refresh !== undefined) body.refresh = options.refresh;
     if (options?.policy) body.policy = options.policy;
 
-    return this.request<AssessResponse>('/v1/assess', {
+    const { data, headers } = await this.requestWithHeaders<AssessResponse>('/v1/assess', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    const quota = extractQuota(headers);
+    return quota ? { ...data, quota } : data;
   }
 
   async createSession(options?: SessionCreateOptions): Promise<SessionCreateResponse> {
@@ -146,7 +165,37 @@ export class AgentScore {
     });
   }
 
+  /** Fire-and-forget telemetry: report a wallet-signer-match verdict so AgentScore can
+   *  track aggregate signer-binding behavior across merchants. Does not throw; failures
+   *  are logged at warn level so persistent telemetry outages are visible in ops logs.
+   *  Used internally by the commerce gate's `verifyWalletSignerMatch` helper. */
+  async telemetrySignerMatch(payload: {
+    claimed_wallet?: string;
+    signer?: string | null;
+    network?: 'evm' | 'solana';
+    kind: 'pass' | 'wallet_signer_mismatch' | 'wallet_auth_requires_wallet_signing';
+    [key: string]: unknown;
+  }): Promise<void> {
+    try {
+      await this.request<void>('/v1/telemetry/signer-match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.warn('[@agent-score/sdk] telemetrySignerMatch failed:', err instanceof Error ? err.message : err);
+    }
+  }
+
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
+    const { data } = await this.requestWithHeaders<T>(path, options);
+    return data;
+  }
+
+  /** Returns both the parsed body and the response Headers. Public methods that need to
+   *  capture per-request headers (e.g. assess() reading X-Quota-*) use this; everything
+   *  else uses request<T>(). */
+  private async requestWithHeaders<T>(path: string, options?: RequestInit): Promise<{ data: T; headers: Headers }> {
     const url = `${this.baseUrl}${path}`;
 
     const headers: Record<string, string> = {
@@ -178,44 +227,89 @@ export class AgentScore {
         const retryTimer = setTimeout(() => retryController.abort(), this.timeout);
         try {
           const retry = await fetch(url, { ...options, headers, signal: retryController.signal });
-          if (retry.ok) return (await retry.json()) as T;
-
-          throw new AgentScoreError('rate_limited', 'Rate limit exceeded', 429);
+          if (retry.ok) {
+            const data = (await retry.json()) as T;
+            return { data, headers: retry.headers };
+          }
+          // 429 still after retry — discriminate quota vs rate.
+          throw await buildErrorFromResponse(retry);
         } finally {
           clearTimeout(retryTimer);
         }
       }
 
       if (!response.ok) {
-        let code = 'unknown_error';
-        let message = `Request failed with status ${response.status}`;
-        let details: Record<string, unknown> = {};
-
-        try {
-          const body = (await response.json()) as AgentScoreErrorBody & Record<string, unknown>;
-          if (body?.error) {
-            code = body.error.code;
-            message = body.error.message;
-          }
-          // Preserve everything except the parsed `error` block so consumers can read
-          // verify_url, linked_wallets, reasons, etc. for granular denial recovery.
-          const { error: _omit, ...rest } = body;
-          details = rest;
-        } catch {
-          // Use defaults
-        }
-
-        throw new AgentScoreError(code, message, response.status, details);
+        throw await buildErrorFromResponse(response);
       }
 
-      return (await response.json()) as T;
+      const data = (await response.json()) as T;
+      return { data, headers: response.headers };
     } catch (err) {
       if (err instanceof AgentScoreError) throw err;
       const message = err instanceof Error ? err.message : 'Unknown error';
-      const code = signal.aborted ? 'timeout' : 'network_error';
-      throw new AgentScoreError(code, message, 0);
+      if (signal.aborted) throw new TimeoutError(message);
+      throw new AgentScoreError('network_error', message, 0);
     } finally {
       clearTimeout(timer);
     }
   }
+}
+
+/** Parse `X-Quota-Limit`, `X-Quota-Used`, `X-Quota-Reset` from response headers. Returns
+ *  `undefined` when none of the three are present (Enterprise / unlimited tiers). Numeric
+ *  fields fall back to `null` if the header is malformed; reset stays as a string ('never'
+ *  or ISO-8601 timestamp). */
+function extractQuota(headers: Headers | undefined): QuotaInfo | undefined {
+  // Test mocks may stub Response without a real Headers object — defend against it
+  // rather than blowing up the assess() return path on bad mocks.
+  if (!headers || typeof headers.get !== 'function') return undefined;
+  const limit = headers.get('x-quota-limit');
+  const used = headers.get('x-quota-used');
+  const reset = headers.get('x-quota-reset');
+  if (limit === null && used === null && reset === null) return undefined;
+  return {
+    limit: parseQuotaNumber(limit),
+    used: parseQuotaNumber(used),
+    reset,
+  };
+}
+
+function parseQuotaNumber(raw: string | null): number | null {
+  if (raw === null) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Map a non-2xx Response to the right typed AgentScoreError subclass. Reads the body to
+ *  extract `error.code` for discrimination + the rest for `details`. Falls through to a
+ *  generic `AgentScoreError` for codes the SDK doesn't have a dedicated subclass for. */
+async function buildErrorFromResponse(response: Response): Promise<AgentScoreError> {
+  let code = 'unknown_error';
+  let message = `Request failed with status ${response.status}`;
+  let details: Record<string, unknown> = {};
+
+  try {
+    const body = (await response.json()) as AgentScoreErrorBody & Record<string, unknown>;
+    if (body?.error) {
+      code = body.error.code;
+      message = body.error.message;
+    }
+    // Preserve everything except the parsed `error` block so consumers can read
+    // verify_url, linked_wallets, reasons, etc. for granular denial recovery.
+    const { error: _omit, ...rest } = body;
+    details = rest;
+  } catch {
+    // Body wasn't JSON or didn't have the expected shape — keep defaults.
+  }
+
+  if (response.status === 402) return new PaymentRequiredError(message, details);
+  if (response.status === 401) {
+    if (code === 'token_expired') return new TokenExpiredError(message, details);
+    if (code === 'invalid_credential') return new InvalidCredentialError(message, details);
+  }
+  if (response.status === 429) {
+    if (code === 'quota_exceeded') return new QuotaExceededError(message, details);
+    if (code === 'rate_limited') return new RateLimitedError(message, details);
+  }
+  return new AgentScoreError(code, message, response.status, details);
 }
