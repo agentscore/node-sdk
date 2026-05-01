@@ -998,13 +998,14 @@ describe('TokenExpiredError — body-field edge cases', () => {
 describe('AgentScore.telemetrySignerMatch()', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('posts to /v1/telemetry/signer-match with the supplied payload', async () => {
+  it('posts to /v1/telemetry/signer-match with the supplied payload + Content-Type header', async () => {
     mockFetchOk({});
     const client = new AgentScore({ apiKey: API_KEY });
     await client.telemetrySignerMatch({ kind: 'pass', signer: '0xabc', network: 'evm' });
     const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(fetchCall[0]).toContain('/v1/telemetry/signer-match');
     expect(fetchCall[1].method).toBe('POST');
+    expect((fetchCall[1].headers as Record<string, string>)['Content-Type']).toBe('application/json');
     const body = JSON.parse(fetchCall[1].body as string);
     expect(body).toEqual({ kind: 'pass', signer: '0xabc', network: 'evm' });
   });
