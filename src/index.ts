@@ -276,9 +276,10 @@ function extractQuota(headers: Headers | undefined): QuotaInfo | undefined {
 
 function parseQuotaNumber(raw: string | null): number | null {
   if (raw === null) return null;
-  // Strict integer check — match Python int()'s behavior so the same malformed header
-  // produces the same `null` in both SDKs (no silent 0 from `Number("")` or float-truncation
-  // from `parseInt("1.5", 10)`).
+  // Strict integer-only — `Number('')` would silently return 0 and `parseInt('1.5', 10)`
+  // would truncate to 1; both are wrong for malformed headers. Use a regex on trimmed
+  // input so empty / decimal / scientific / alpha all return null. This matches the
+  // behavior of Python's int() (which trims whitespace and rejects non-integer strings).
   const trimmed = raw.trim();
   if (!/^-?\d+$/.test(trimmed)) return null;
   return Number(trimmed);

@@ -868,6 +868,127 @@ describe('AgentScore.assess() — quota capture', () => {
     const res = await client.assess(WALLET);
     expect(res.quota).toEqual({ limit: null, used: null, reset: '2026-06-01T00:00:00Z' });
   });
+
+  it('captures quota headers from the retry response on 429 → 200 (not the discarded original)', async () => {
+    let callCount = 0;
+    global.fetch = vi.fn().mockImplementation(() => {
+      callCount += 1;
+      if (callCount === 1) {
+        return Promise.resolve({
+          ok: false,
+          status: 429,
+          json: () => Promise.resolve({}),
+          headers: new Headers({ 'retry-after': '0' }),
+        } as unknown as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(ASSESS_RESPONSE),
+        headers: new Headers({
+          'x-quota-limit': '500',
+          'x-quota-used': '321',
+          'x-quota-reset': '2026-07-01T00:00:00Z',
+        }),
+      } as unknown as Response);
+    });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const res = await client.assess(WALLET);
+    expect(callCount).toBe(2);
+    expect(res.quota).toEqual({ limit: 500, used: 321, reset: '2026-07-01T00:00:00Z' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Generic 4xx fallthrough — codes the SDK doesn't have a typed subclass for
+// ---------------------------------------------------------------------------
+
+describe('AgentScore — generic 4xx fallthrough', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('400 invalid_request falls through to generic AgentScoreError (not a typed subclass)', async () => {
+    mockFetchError(400, { error: { code: 'invalid_request', message: 'bad body' } });
+    const client = new AgentScore({ apiKey: API_KEY });
+    try {
+      await client.assess(WALLET);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(AgentScoreError);
+      // Must NOT be any typed subclass
+      expect(e).not.toBeInstanceOf(PaymentRequiredError);
+      expect(e).not.toBeInstanceOf(TokenExpiredError);
+      expect(e).not.toBeInstanceOf(InvalidCredentialError);
+      expect(e).not.toBeInstanceOf(QuotaExceededError);
+      expect(e).not.toBeInstanceOf(RateLimitedError);
+      expect(e).not.toBeInstanceOf(TimeoutError);
+      const err = e as AgentScoreError;
+      expect(err.code).toBe('invalid_request');
+      expect(err.status).toBe(400);
+    }
+  });
+
+  it('403 account_cancelled falls through to generic AgentScoreError', async () => {
+    mockFetchError(403, { error: { code: 'account_cancelled', message: 'cancelled' } });
+    const client = new AgentScore({ apiKey: API_KEY });
+    try {
+      await client.assess(WALLET);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(AgentScoreError);
+      expect(e).not.toBeInstanceOf(PaymentRequiredError);
+      const err = e as AgentScoreError;
+      expect(err.code).toBe('account_cancelled');
+      expect(err.status).toBe(403);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TokenExpiredError — body-field edge cases
+// ---------------------------------------------------------------------------
+
+describe('TokenExpiredError — body-field edge cases', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('all parsed-body fields stay undefined when API returns 401 token_expired with no body extras', async () => {
+    mockFetchError(401, { error: { code: 'token_expired', message: 'Expired' } });
+    const client = new AgentScore({ apiKey: API_KEY });
+    try {
+      await client.assess(WALLET);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      // Still a TokenExpiredError (not falling through to generic)
+      expect(e).toBeInstanceOf(TokenExpiredError);
+      const err = e as TokenExpiredError;
+      expect(err.verifyUrl).toBeUndefined();
+      expect(err.sessionId).toBeUndefined();
+      expect(err.pollSecret).toBeUndefined();
+      expect(err.pollUrl).toBeUndefined();
+      expect(err.nextSteps).toBeUndefined();
+      expect(err.agentMemory).toBeUndefined();
+    }
+  });
+
+  it('TokenExpiredError fields silently ignored when API returns wrong types (e.g. number for verify_url)', async () => {
+    mockFetchError(401, {
+      error: { code: 'token_expired', message: 'Expired' },
+      verify_url: 12345, // wrong type
+      session_id: ['not', 'a', 'string'], // wrong type
+    });
+    const client = new AgentScore({ apiKey: API_KEY });
+    try {
+      await client.assess(WALLET);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(TokenExpiredError);
+      const err = e as TokenExpiredError;
+      // Strings only — wrong types ignored, instance fields stay undefined.
+      expect(err.verifyUrl).toBeUndefined();
+      expect(err.sessionId).toBeUndefined();
+      // The original body still flows through `details` so callers can inspect raw values.
+      expect(err.details.verify_url).toBe(12345);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
