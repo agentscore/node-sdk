@@ -857,6 +857,17 @@ describe('AgentScore.assess() — quota capture', () => {
     const res = await client.assess(WALLET);
     expect(res.quota).toBeUndefined();
   });
+
+  it('returns null for malformed numeric headers (empty / decimal / non-integer) — parity with python-sdk', async () => {
+    mockFetchOkWithHeaders(ASSESS_RESPONSE, {
+      'x-quota-limit': '',           // empty — Number('') would be 0 without strict check
+      'x-quota-used': '1.5',         // decimal — Number('1.5') is finite but not an integer
+      'x-quota-reset': '2026-06-01T00:00:00Z',
+    });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const res = await client.assess(WALLET);
+    expect(res.quota).toEqual({ limit: null, used: null, reset: '2026-06-01T00:00:00Z' });
+  });
 });
 
 // ---------------------------------------------------------------------------

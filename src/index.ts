@@ -276,8 +276,12 @@ function extractQuota(headers: Headers | undefined): QuotaInfo | undefined {
 
 function parseQuotaNumber(raw: string | null): number | null {
   if (raw === null) return null;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : null;
+  // Strict integer check — match Python int()'s behavior so the same malformed header
+  // produces the same `null` in both SDKs (no silent 0 from `Number("")` or float-truncation
+  // from `parseInt("1.5", 10)`).
+  const trimmed = raw.trim();
+  if (!/^-?\d+$/.test(trimmed)) return null;
+  return Number(trimmed);
 }
 
 /** Map a non-2xx Response to the right typed AgentScoreError subclass. Reads the body to
