@@ -131,22 +131,58 @@ try {
 }
 ```
 
-`AgentScoreError.details` carries the rest of the response body — `verify_url`, `linked_wallets`, `claimed_operator`, `actual_signer`, `expected_signer`, `reasons`, `agent_memory` — so callers can branch on granular denial codes without re-parsing:
+`AgentScoreError.details` carries the rest of the response body — `verify_url`, `linked_wallets`, `claimed_operator`, `actual_signer`, `expected_signer`, `reasons`, `agent_memory` — so callers can branch on granular denial codes without re-parsing.
+
+### Typed error classes
+
+For status-code-specific recovery, the SDK throws typed subclasses of `AgentScoreError`. All inherit from `AgentScoreError` so existing `catch (err) { if (err instanceof AgentScoreError) ... }` still works.
+
+| Class | Triggered by | What it adds |
+|---|---|---|
+| `PaymentRequiredError` | HTTP 402 | The endpoint is not enabled for this account |
+| `TokenExpiredError` | HTTP 401 with `error.code = "token_expired"` | Parsed body fields exposed on the instance: `verifyUrl`, `sessionId`, `pollSecret`, `pollUrl`, `nextSteps`, `agentMemory` — recover without re-parsing `details` |
+| `InvalidCredentialError` | HTTP 401 with `error.code = "invalid_credential"` | Permanent — switch tokens or restart |
+| `QuotaExceededError` | HTTP 429 with `error.code = "quota_exceeded"` | Account-level cap reached; don't retry |
+| `RateLimitedError` | HTTP 429 with `error.code = "rate_limited"` | Per-second sliding-window cap; retry after `Retry-After` |
+| `TimeoutError` | Request aborted before a response arrived | Distinct from generic network errors |
 
 ```typescript
+import {
+  AgentScore, AgentScoreError, TokenExpiredError, QuotaExceededError, TimeoutError,
+} from "@agent-score/sdk";
+
 try {
   await client.assess("0xabc...", { policy: { require_kyc: true } });
 } catch (err) {
-  if (!(err instanceof AgentScoreError)) throw err;
-  if (err.code === "wallet_signer_mismatch") {
-    const linked = err.details.linked_wallets as string[] | undefined;
-    console.log("Re-sign from one of:", linked);
-  }
-  if (err.code === "token_expired") {
-    console.log("Verify at:", err.details.verify_url);
+  if (err instanceof TokenExpiredError) {
+    console.log("Verify at:", err.verifyUrl, "poll with:", err.pollSecret);
+  } else if (err instanceof QuotaExceededError) {
+    console.log("Account quota reached — surface to user; don't retry.");
+  } else if (err instanceof TimeoutError) {
+    console.log("Network timeout — retry with backoff.");
+  } else if (err instanceof AgentScoreError) {
+    console.error(err.code, err.message);
   }
 }
 ```
+
+## Quota observability
+
+`assess()` responses include an optional `quota` field captured from `X-Quota-Limit` / `X-Quota-Used` / `X-Quota-Reset` response headers. Use it to monitor approach-to-cap proactively (warn at 80%, alert at 95%) before a 429:
+
+```typescript
+const result = await client.assess("0xabc...", { policy: { require_kyc: true } });
+if (result.quota && result.quota.limit && result.quota.used) {
+  const pct = (result.quota.used / result.quota.limit) * 100;
+  if (pct > 80) console.warn(`AgentScore quota at ${pct.toFixed(1)}% — resets ${result.quota.reset}`);
+}
+```
+
+`quota` is `undefined` when the API doesn't emit the headers (Enterprise / unlimited tiers).
+
+## Telemetry
+
+`telemetrySignerMatch(payload)` is a fire-and-forget POST to `/v1/telemetry/signer-match` so AgentScore can track aggregate signer-binding behavior across merchants. Used internally by `@agent-score/commerce`'s gate; available directly for custom integrations that perform their own wallet-signer-match checks.
 
 ## Documentation
 

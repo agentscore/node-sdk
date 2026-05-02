@@ -9,13 +9,20 @@ Two identity paths: `X-Wallet-Address` (wallet-based) and `X-Operator-Token` (cr
 ## Methods
 
 - `getReputation(address, options?)` — cached reputation lookup (free)
-- `assess(address, options?)` — identity gate with policy (paid). Accepts `operatorToken` for non-wallet agents. Response includes `linked_wallets[]` and `resolved_operator`.
+- `assess(address, options?)` — identity gate with policy (paid). Accepts `operatorToken` for non-wallet agents. Response includes `linked_wallets[]` and `resolved_operator`. Optional `resolveSigner: { address, network }` opts into server-side wallet-signer-match — the response then carries a `signer_match` block describing whether the supplied signer wallet resolves to the same operator as the claimed `address`.
 - `createSession(options?)` — create verification session for identity bootstrapping. Returns `agent_memory` + `next_steps`.
 - `pollSession(sessionId, pollSecret)` — poll session status, returns credential when verified, plus `next_steps.action`.
 - `createCredential(options?)` — create operator credential (24h TTL default). Response includes `agent_memory`.
 - `listCredentials()` — list active credentials
 - `revokeCredential(id)` — revoke a credential
 - `associateWallet({ operatorToken, walletAddress, network, idempotencyKey? })` — report a signer wallet seen paying under a credential. Fire-and-forget; use the payment intent id / tx hash as `idempotencyKey` so retries don't inflate transaction_count.
+- `telemetrySignerMatch(payload)` — fire-and-forget POST to `/v1/telemetry/signer-match`; commerce gate uses this to report `pass` / `wallet_signer_mismatch` / `wallet_auth_requires_wallet_signing` verdicts.
+
+## Errors + observability
+
+Typed error subclasses of `AgentScoreError` so callers can branch on `instanceof` without parsing `err.code`: `PaymentRequiredError` (402), `TokenExpiredError` (401 token_expired — exposes parsed `verifyUrl` / `sessionId` / `pollSecret` / `pollUrl` / `nextSteps` / `agentMemory` instance fields), `InvalidCredentialError` (401 invalid_credential), `QuotaExceededError` (429 quota_exceeded — don't retry), `RateLimitedError` (429 rate_limited — retry after Retry-After), `TimeoutError` (request abort/timeout). All preserve the existing `AgentScoreError` catch behavior.
+
+`assess()` responses include an optional `quota` field captured from `X-Quota-Limit` / `X-Quota-Used` / `X-Quota-Reset` response headers, so callers can monitor approach-to-cap proactively before hitting 429.
 
 ## Architecture
 

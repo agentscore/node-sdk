@@ -496,8 +496,8 @@ describe('AgentScore.associateWallet()', () => {
     }
   });
 
-  it('throws AgentScoreError on 402 payment_required (free tier)', async () => {
-    mockFetchError(402, { error: { code: 'payment_required', message: 'paid only' } });
+  it('throws AgentScoreError on 402 payment_required', async () => {
+    mockFetchError(402, { error: { code: 'payment_required', message: 'endpoint not enabled' } });
     const client = new AgentScore({ apiKey: API_KEY });
     await expect(client.associateWallet(ASSOCIATE_OPTIONS)).rejects.toBeInstanceOf(AgentScoreError);
   });
