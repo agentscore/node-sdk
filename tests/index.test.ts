@@ -348,6 +348,40 @@ describe('AgentScore.assess()', () => {
       throw new Error('expected unavailable variant');
     }
   });
+
+  it('preserves Solana base58 case in signer (no lowercasing)', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    const sol = 'DRpbCBMxVnDK7maPM5tGv6MvB3v1sRMC86PZ8okm21hy';
+    await client.assess(WALLET, { signer: { address: sol, network: 'solana' } });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as { signer?: { address: string } };
+    expect(body.signer?.address).toBe(sol); // byte-equal
+  });
+
+  it('forwards signer.address=null for rails with no wallet signer', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(WALLET, { signer: { address: null, network: 'evm' } });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.signer).toEqual({ address: null, network: 'evm' });
+  });
+
+  it('throws TokenExpiredError on 401 even when signer was sent', async () => {
+    mockFetchError(401, {
+      error: { code: 'token_expired', message: 'expired' },
+      verify_url: 'https://example/verify',
+    });
+    const client = new AgentScore({ apiKey: API_KEY });
+    await expect(
+      client.assess(null, { operatorToken: 'opc_expired', signer: { address: '0xs', network: 'evm' } }),
+    ).rejects.toBeInstanceOf(AgentScoreError);
+    // Verify signer was on the wire
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.signer).toEqual({ address: '0xs', network: 'evm' });
+  });
 });
 
 // ---------------------------------------------------------------------------
