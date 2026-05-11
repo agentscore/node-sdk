@@ -83,6 +83,34 @@ await client.createSession({ operator_token: "opc_..." }); // KYC refresh
 
 `assess()` responses include `resolved_operator` and `linked_wallets[]` — all same-operator sibling wallets (claimed via SIWE or captured via prior `associateWallet`). The list may mix EVM addresses (`0x...` lowercased) and Solana addresses (base58, case-preserved) for cross-chain operators; merchants doing wallet-signer-match checks should accept a payment signed by any address in the list, regardless of chain. The `address` parameter on `assess()` and `getReputation()` accepts either format — network is auto-detected from the address shape.
 
+### Server-side signer-match + sanctions screening
+
+Pass `signer: { address, network }` on `assess()` to opt into server-side wallet-signer-match and OFAC SDN wallet-address screening on the same call. The response carries two new verdicts:
+
+```typescript
+const result = await client.assess("0xclaimed...", {
+  signer: { address: "0xsigner...", network: "evm" },
+  policy: { require_sanctions_clear: true },
+});
+
+// signer_match: wallet-binding verdict
+//   kind: 'pass' | 'wallet_signer_mismatch' | 'wallet_auth_requires_wallet_signing'
+//   plus claimed_operator / signer_operator / expected_signer / actual_signer / linked_wallets / agent_instructions
+if (result.signer_match?.kind === "wallet_signer_mismatch") {
+  // signer wallet resolves to a different operator than the claimed address
+}
+
+// signer_sanctions: OFAC SDN wallet-address verdict (discriminated union)
+//   { status: 'clear' } | { sanctioned: true, ofac_label, sdn_uid, listed_at } | { status: 'unavailable' }
+if (result.signer_sanctions && "sanctioned" in result.signer_sanctions) {
+  console.log("OFAC hit:", result.signer_sanctions.ofac_label, result.signer_sanctions.sdn_uid);
+}
+```
+
+Under `policy.require_sanctions_clear`, the API flips `decision` to `deny` when `signer_sanctions` is `sanctioned: true` OR `status: 'unavailable'` — `decision_reasons` will include `sanctions_flagged` or `sanctions_check_unavailable` respectively (fail-closed; OFAC strict-liability). Without the policy flag, both verdicts are informational.
+
+Pass `signer.address: null` for rails without a wallet signer (Stripe SPT, card-only). The API responds with `signer_match.kind = 'wallet_auth_requires_wallet_signing'` and a parsed `agent_instructions` block telling the agent to switch to `X-Operator-Token` auth — spread the block directly into a 403 body.
+
 ### Credential Management
 
 ```typescript
@@ -178,7 +206,7 @@ if (result.quota && result.quota.limit && result.quota.used) {
 }
 ```
 
-`quota` is `undefined` when the API doesn't emit the headers (Enterprise / unlimited tiers).
+`quota` is `undefined` when the API doesn't emit the headers (Enterprise / unlimited tiers). On a 429 response the SDK throws `QuotaExceededError` / `RateLimitedError` instead of returning a body, so `quota` is only readable on successful calls — drive proactive alerting off the success-path field.
 
 ## Telemetry
 

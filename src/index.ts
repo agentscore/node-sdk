@@ -80,7 +80,7 @@ export class AgentScore {
     if (options?.chain) body.chain = options.chain;
     if (options?.refresh !== undefined) body.refresh = options.refresh;
     if (options?.policy) body.policy = options.policy;
-    if (options?.resolveSigner) body.resolve_signer = options.resolveSigner;
+    if (options?.signer) body.signer = options.signer;
 
     const { data, headers } = await this.requestWithHeaders<AssessResponse>('/v1/assess', {
       method: 'POST',
@@ -168,8 +168,7 @@ export class AgentScore {
 
   /** Fire-and-forget telemetry: report a wallet-signer-match verdict so AgentScore can
    *  track aggregate signer-binding behavior across merchants. Does not throw; failures
-   *  are logged at warn level so persistent telemetry outages are visible in ops logs.
-   *  Used internally by the commerce gate's `verifyWalletSignerMatch` helper. */
+   *  are logged at warn level so persistent telemetry outages are visible in ops logs. */
   async telemetrySignerMatch(payload: {
     claimed_wallet?: string;
     signer?: string | null;
