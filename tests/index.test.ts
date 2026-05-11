@@ -270,6 +270,84 @@ describe('AgentScore.assess()', () => {
     const client = new AgentScore({ apiKey: API_KEY });
     await expect(client.assess(WALLET)).rejects.toBeInstanceOf(AgentScoreError);
   });
+
+  // ── signer (server-side wallet-signer-match + sanctions screening) ──────
+
+  it('forwards signer in request body when provided', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    const signer = { address: '0xsigner000000000000000000000000000000abc1', network: 'evm' as const };
+    await client.assess(WALLET, { signer });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.signer).toEqual(signer);
+  });
+
+  it('omits signer when not provided', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(WALLET);
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.signer).toBeUndefined();
+  });
+
+  it('returns signer_match + signer_sanctions on the response', async () => {
+    mockFetchOk({
+      ...ASSESS_RESPONSE,
+      signer_match: {
+        kind: 'wallet_signer_mismatch',
+        claimed_operator: 'op_claimed',
+        signer_operator: 'op_attacker',
+        expected_signer: '0xclaimed',
+        actual_signer: '0xattacker',
+        linked_wallets: ['0xclaimed'],
+        agent_instructions: '{"action":"resign_or_switch_to_operator_token","steps":[],"user_message":"x"}',
+      },
+      signer_sanctions: {
+        sanctioned: true,
+        ofac_label: 'ETH',
+        sdn_uid: '19011',
+        listed_at: '2019-09-13T07:00:00.000Z',
+      },
+    });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.assess(WALLET, { signer: { address: '0xattacker', network: 'evm' } });
+    expect(result.signer_match?.kind).toBe('wallet_signer_mismatch');
+    expect(result.signer_match?.expected_signer).toBe('0xclaimed');
+    // Narrow on `sanctioned` discriminator
+    expect(result.signer_sanctions).toBeDefined();
+    if (result.signer_sanctions && 'sanctioned' in result.signer_sanctions) {
+      expect(result.signer_sanctions.sanctioned).toBe(true);
+      expect(result.signer_sanctions.ofac_label).toBe('ETH');
+    } else {
+      throw new Error('expected sanctioned variant');
+    }
+  });
+
+  it('returns signer_sanctions clear variant', async () => {
+    mockFetchOk({ ...ASSESS_RESPONSE, signer_sanctions: { status: 'clear' } });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.assess(WALLET, { signer: { address: '0xs', network: 'evm' } });
+    expect(result.signer_sanctions).toBeDefined();
+    if (result.signer_sanctions && 'status' in result.signer_sanctions) {
+      expect(result.signer_sanctions.status).toBe('clear');
+    } else {
+      throw new Error('expected clear variant');
+    }
+  });
+
+  it('returns signer_sanctions unavailable variant', async () => {
+    mockFetchOk({ ...ASSESS_RESPONSE, signer_sanctions: { status: 'unavailable' } });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.assess(WALLET, { signer: { address: '0xs', network: 'evm' } });
+    expect(result.signer_sanctions).toBeDefined();
+    if (result.signer_sanctions && 'status' in result.signer_sanctions) {
+      expect(result.signer_sanctions.status).toBe('unavailable');
+    } else {
+      throw new Error('expected unavailable variant');
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
