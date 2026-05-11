@@ -109,6 +109,8 @@ if (result.signer_sanctions && "sanctioned" in result.signer_sanctions) {
 
 Under `policy.require_sanctions_clear`, the API flips `decision` to `deny` when `signer_sanctions` is `sanctioned: true` OR `status: 'unavailable'` — `decision_reasons` will include `sanctions_flagged` or `sanctions_check_unavailable` respectively (fail-closed; OFAC strict-liability). Without the policy flag, both verdicts are informational.
 
+Pass `signer.address: null` for rails without a wallet signer (Stripe SPT, card-only). The API responds with `signer_match.kind = 'wallet_auth_requires_wallet_signing'` and a parsed `agent_instructions` block telling the agent to switch to `X-Operator-Token` auth — spread the block directly into a 403 body.
+
 ### Credential Management
 
 ```typescript
@@ -204,7 +206,7 @@ if (result.quota && result.quota.limit && result.quota.used) {
 }
 ```
 
-`quota` is `undefined` when the API doesn't emit the headers (Enterprise / unlimited tiers).
+`quota` is `undefined` when the API doesn't emit the headers (Enterprise / unlimited tiers). On a 429 response the SDK throws `QuotaExceededError` / `RateLimitedError` instead of returning a body, so `quota` is only readable on successful calls — drive proactive alerting off the success-path field.
 
 ## Telemetry
 
