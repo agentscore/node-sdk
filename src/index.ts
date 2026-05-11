@@ -80,7 +80,7 @@ export class AgentScore {
     if (options?.chain) body.chain = options.chain;
     if (options?.refresh !== undefined) body.refresh = options.refresh;
     if (options?.policy) body.policy = options.policy;
-    if (options?.resolveSigner) body.resolve_signer = options.resolveSigner;
+    if (options?.signer) body.signer = options.signer;
 
     const { data, headers } = await this.requestWithHeaders<AssessResponse>('/v1/assess', {
       method: 'POST',

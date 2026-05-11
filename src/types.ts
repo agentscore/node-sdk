@@ -146,12 +146,12 @@ export interface DecisionPolicy {
   allowed_jurisdictions?: string[];
 }
 
-/** Server-side wallet-signer-match request. When present in `AssessRequest.resolve_signer`,
- *  the API resolves this wallet against the claimed `address` and emits a `signer_match`
- *  block on the response. Lets commerce gates collapse the legacy 2 follow-up assess
- *  calls (one per wallet) into the gate's primary assess call. Strictly additive — old
- *  clients that don't send this field see no `signer_match` on the response. */
-export interface ResolveSigner {
+/** Payment-signer wallet supplied to `/v1/assess`. When present in `AssessRequest.signer`,
+ *  the API runs two server-side checks: (1) wallet-binding (`signer_match`) and (2) OFAC
+ *  SDN wallet-address sanctions (`signer_sanctions`). Both verdicts are emitted on the
+ *  response. Lets commerce gates collapse the legacy 2 follow-up assess calls (one per
+ *  wallet) AND the wallet-sanctions check into the gate's primary assess call. */
+export interface Signer {
   /** Recovered payment-signer wallet. `null` indicates the rail carries no wallet
    *  signature (Stripe SPT, card) — produces `signer_match.kind = "wallet_auth_requires_wallet_signing"`. */
   address: string | null;
@@ -160,7 +160,7 @@ export interface ResolveSigner {
 }
 
 /** Server-side wallet-signer-match verdict. Emitted on `AssessResponse.signer_match` when
- *  the request supplied `resolve_signer`. Mirrors the verdict shape commerce SDK gates
+ *  the request supplied `signer`. Mirrors the verdict shape commerce SDK gates
  *  produce locally; SDK consumers spread this into 403 bodies verbatim instead of
  *  re-deriving via 2 extra `/v1/assess` round trips. */
 export interface SignerMatch {
@@ -194,9 +194,39 @@ export interface AssessRequest {
   chain?: string;
   refresh?: boolean;
   policy?: DecisionPolicy;
-  /** Optional server-side wallet-signer-match. See {@link ResolveSigner}. */
-  resolve_signer?: ResolveSigner;
+  /** Optional server-side signer verdicts (wallet-binding + OFAC SDN). See {@link Signer}. */
+  signer?: Signer;
 }
+
+/** Server-side OFAC SDN wallet-address verdict. Emitted on `AssessResponse.signer_sanctions`
+ *  when the request supplied `signer`. AgentScore pulls the OFAC SDN Advanced XML hourly
+ *  into an indexed `ofac_sanctioned_addresses` table; this is the verdict from that lookup.
+ *
+ *  Three terminal states:
+ *    - `{ status: 'clear' }`                           — address not on the OFAC SDN list
+ *    - `{ sanctioned: true, ofac_label, sdn_uid, ... }` — hit; gate must fail-closed
+ *    - `{ status: 'unavailable' }`                     — lookup itself failed (DB error); fail-closed
+ *
+ *  Fail-closed posture: under `policy.require_sanctions_clear`, a hit OR an unavailable
+ *  lookup flips the response `decision` to `deny` with `decision_reasons` including
+ *  `sanctions_flagged` (hit) or `sanctions_check_unavailable` (lookup failure). Asymmetric
+ *  cost — falsely allowing a sanctioned settle is an OFAC strict-liability violation;
+ *  falsely denying a clean buyer is bad UX. */
+export type SignerSanctions =
+  | { status: 'clear' }
+  | {
+      sanctioned: true;
+      /** Raw OFAC Digital Currency Address label the hit was published under (`ETH`, `XBT`,
+       *  `USDT`, `SOL`, etc.). Investigation-history metadata; not the chain-applicability
+       *  enforcement axis (that's keyed on the format-classified family). */
+      ofac_label: string;
+      /** SDN entry's Identity ID. Same `sdn_uid` may surface multiple addresses (one
+       *  entity, multiple wallets); join key for audit. */
+      sdn_uid: string;
+      /** ISO date OFAC initially designated the entity. `null` if upstream omits it. */
+      listed_at: string | null;
+    }
+  | { status: 'unavailable' };
 
 export interface PolicyCheck {
   rule: string;
@@ -247,8 +277,11 @@ export interface AssessResponse {
   policy_result?: PolicyResult | null;
   explanation?: PolicyExplanation[];
   /** Server-side wallet-signer-match verdict, returned only when the request supplied
-   *  `resolve_signer`. Empty otherwise. */
+   *  `signer`. Empty otherwise. */
   signer_match?: SignerMatch;
+  /** Server-side OFAC SDN wallet-address verdict, returned only when the request supplied
+   *  `signer`. Empty otherwise. See {@link SignerSanctions}. */
+  signer_sanctions?: SignerSanctions;
   /** Quota state for this account, captured from response headers. Use it to monitor
    *  approach-to-cap proactively (e.g. warn at 80%, alert at 95%) before hitting a 429. */
   quota?: QuotaInfo;
@@ -435,9 +468,10 @@ export interface AssessOptions {
   refresh?: boolean;
   policy?: DecisionPolicy;
   operatorToken?: string;
-  /** Optional server-side wallet-signer-match. Lets commerce gates collapse the legacy
-   *  2 follow-up assess calls into the gate's primary assess call. See {@link ResolveSigner}. */
-  resolveSigner?: ResolveSigner;
+  /** Optional payment-signer wallet. Lets commerce gates collapse the legacy 2 follow-up
+   *  assess calls + the wallet-sanctions check into the gate's primary assess call. The
+   *  response then carries `signer_match` + `signer_sanctions` verdicts. See {@link Signer}. */
+  signer?: Signer;
 }
 
 export interface SessionCreateOptions {
