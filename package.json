@@ -1,6 +1,6 @@
 {
   "name": "@agent-score/sdk",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "TypeScript client for the AgentScore APIs",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -53,7 +53,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "@types/node": "^25.7.0",
+    "@types/node": "^25.8.0",
     "@vitest/coverage-v8": "^4.1.6",
     "dotenv": "^17.4.2",
     "eslint": "^9.39.4",
