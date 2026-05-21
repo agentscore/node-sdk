@@ -107,7 +107,7 @@ if (result.signer_sanctions && "sanctioned" in result.signer_sanctions) {
 }
 ```
 
-Under `policy.require_sanctions_clear`, the API flips `decision` to `deny` when `signer_sanctions` is `sanctioned: true` OR `status: 'unavailable'` — `decision_reasons` will include `sanctions_flagged` or `sanctions_check_unavailable` respectively (fail-closed; OFAC strict-liability). Without the policy flag, both verdicts are informational.
+Wallet-OFAC SDN enforcement on the `signer` block is unconditional whenever a signer is supplied — no `policy.require_sanctions_clear` opt-in required. The API flips `decision` to `deny` when `signer_sanctions` is `sanctioned: true` OR `status: 'unavailable'`, with `decision_reasons` including `sanctions_flagged` or `sanctions_check_unavailable` respectively (fail-closed; OFAC strict-liability). `policy.require_sanctions_clear` is the separate NAME-based screen on the resolved operator's KYC identity.
 
 Pass `signer.address: null` for rails without a wallet signer (Stripe SPT, card-only). The API responds with `signer_match.kind = 'wallet_auth_requires_wallet_signing'` and a parsed `agent_instructions` block telling the agent to switch to `X-Operator-Token` auth — spread the block directly into a 403 body.
 
