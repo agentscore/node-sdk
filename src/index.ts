@@ -183,7 +183,7 @@ export class AgentScore {
         body: JSON.stringify(payload),
       });
     } catch (err) {
-      console.warn('[@agent-score/sdk] telemetrySignerMatch failed:', err instanceof Error ? err.message : err);
+      console.warn('[@agent-score/sdk] telemetrySignerMatch failed:', err);
     }
   }
 
