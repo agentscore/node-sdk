@@ -309,8 +309,10 @@ async function buildErrorFromResponse(response: Response): Promise<AgentScoreErr
   try {
     const body = (await response.json()) as AgentScoreErrorBody & Record<string, unknown>;
     if (body?.error) {
-      code = body.error.code;
-      message = body.error.message;
+      // Guard each field: a malformed body with `error` but no `code`/`message` keeps the
+      // status-based defaults instead of clobbering them with `undefined`.
+      if (body.error.code) code = body.error.code;
+      if (body.error.message) message = body.error.message;
     }
     // Preserve everything except the parsed `error` block so consumers can read
     // verify_url, linked_wallets, reasons, etc. for granular denial recovery.

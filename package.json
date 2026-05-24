@@ -1,6 +1,6 @@
 {
   "name": "@agent-score/sdk",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "description": "TypeScript client for the AgentScore APIs",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

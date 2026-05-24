@@ -370,6 +370,14 @@ export type NextStepsAction =
   | 'verification_failed'
   | 'complete_kyc_then_retry';
 
+/** Structured `next_steps` for a `wallet_signer_mismatch` denial body (present when the
+ *  merchant overrides the gate's default `agent_instructions`). */
+export interface WalletSignerMismatchNextSteps {
+  action: NextStepsAction;
+  user_message?: string;
+  learn_more_url?: string;
+}
+
 /**
  * Error body shape for `wallet_signer_mismatch` denials. The claimed wallet's operator
  * doesn't match the signer's operator. `actual_signer_operator` is null when the signer isn't
@@ -394,12 +402,18 @@ export interface WalletSignerMismatchBody {
    *  a custom `next_steps`. `action` may be any `NextStepsAction` — typically
    *  `resign_or_switch_to_operator_token` (gate default) or
    *  `regenerate_payment_from_linked_wallet` (a merchant-emitted alternative). */
-  next_steps?: {
-    action: NextStepsAction;
-    user_message?: string;
-    learn_more_url?: string;
-  };
+  next_steps?: WalletSignerMismatchNextSteps;
   agent_memory?: AgentMemoryHint;
+}
+
+/** Structured `next_steps` for a `wallet_auth_requires_wallet_signing` denial body (present
+ *  when the merchant overrides the gate's default `agent_instructions`). */
+export interface WalletAuthRequiresSigningNextSteps {
+  action: NextStepsAction;
+  user_message?: string;
+  /** Rails that carry a wallet signature and can be used under wallet-auth. */
+  signer_capable_rails?: string[];
+  learn_more_url?: string;
 }
 
 /**
@@ -418,13 +432,7 @@ export interface WalletAuthRequiresSigningBody {
   /** Structured action guidance. Present when the merchant overrides the gate default.
    *  `action` is typically `switch_to_operator_token` (gate default) or `use_operator_token`
    *  (a merchant-emitted alternative). */
-  next_steps?: {
-    action: NextStepsAction;
-    user_message?: string;
-    /** Rails that carry a wallet signature and can be used under wallet-auth. */
-    signer_capable_rails?: string[];
-    learn_more_url?: string;
-  };
+  next_steps?: WalletAuthRequiresSigningNextSteps;
   agent_memory?: AgentMemoryHint;
 }
 
