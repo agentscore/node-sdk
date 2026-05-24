@@ -173,6 +173,22 @@ describe('AgentScore.getReputation()', () => {
     await expect(client.getReputation(WALLET)).rejects.toBeInstanceOf(AgentScoreError);
   });
 
+  it('throws invalid_response when a 2xx body is not valid JSON', async () => {
+    expect.assertions(2);
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockRejectedValueOnce(new SyntaxError('Unexpected token')),
+    } as unknown as Response);
+    const client = new AgentScore({ apiKey: API_KEY });
+    try {
+      await client.getReputation(WALLET);
+    } catch (e) {
+      expect(e).toBeInstanceOf(AgentScoreError);
+      expect((e as AgentScoreError).code).toBe('invalid_response');
+    }
+  });
+
   it('AgentScoreError has the correct code and status on failure', async () => {
     expect.assertions(4);
     mockFetchError(404, { error: { code: 'not_found', message: 'Wallet not found' } });
