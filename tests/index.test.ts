@@ -997,6 +997,17 @@ describe('AgentScore.assess() — quota capture', () => {
     expect(res.quota).toEqual({ limit: null, used: null, reset: '2026-06-01T00:00:00Z' });
   });
 
+  it('returns null limit/used when only the reset header is present (parseQuotaNumber null path)', async () => {
+    // reset present but limit/used absent → extractQuota does NOT bail (not all three null),
+    // and parseQuotaNumber(null) returns null for the two missing numerics.
+    mockFetchOkWithHeaders(ASSESS_RESPONSE, {
+      'x-quota-reset': 'never',
+    });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const res = await client.assess(WALLET);
+    expect(res.quota).toEqual({ limit: null, used: null, reset: 'never' });
+  });
+
   it('captures quota headers from the retry response on 429 → 200 (not the discarded original)', async () => {
     let callCount = 0;
     global.fetch = vi.fn().mockImplementation(() => {
@@ -1143,5 +1154,252 @@ describe('AgentScore.telemetrySignerMatch()', () => {
     const client = new AgentScore({ apiKey: API_KEY });
     // Should NOT throw.
     await expect(client.telemetrySignerMatch({ kind: 'wallet_signer_mismatch' })).resolves.toBeUndefined();
+  });
+
+  it('warns (without throwing) when the underlying request fails on a non-Error rejection', async () => {
+    // Even when fetch rejects with a non-Error (a plain string), requestWithHeaders wraps
+    // it into an AgentScoreError before it reaches telemetry's catch, so telemetry logs the
+    // wrapped error's message and never throws.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    global.fetch = vi.fn().mockRejectedValueOnce('plain-string-rejection');
+    const client = new AgentScore({ apiKey: API_KEY });
+    await expect(client.telemetrySignerMatch({ kind: 'api_error' })).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createSession / pollSession
+// ---------------------------------------------------------------------------
+
+const SESSION_CREATE_RESPONSE = {
+  session_id: 'sess_abc',
+  poll_secret: 'ps_xyz',
+  verify_url: 'https://agentscore.sh/verify/sess_abc',
+  status: 'pending',
+  next_steps: { action: 'deliver_verify_url_and_poll' },
+};
+
+describe('AgentScore.createSession()', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('posts to /v1/sessions with an empty body when no options are given', async () => {
+    mockFetchOk(SESSION_CREATE_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    const res = await client.createSession();
+    expect(res).toMatchObject(SESSION_CREATE_RESPONSE);
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toBe('https://api.agentscore.sh/v1/sessions');
+    expect(call[1].method).toBe('POST');
+    expect(JSON.parse(call[1].body as string)).toEqual({});
+  });
+
+  it('includes context, product_name, address, and operator_token when provided', async () => {
+    mockFetchOk(SESSION_CREATE_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.createSession({
+      context: 'checkout',
+      product_name: 'Widget',
+      address: WALLET,
+      operator_token: 'opc_sess',
+    });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.context).toBe('checkout');
+    expect(body.product_name).toBe('Widget');
+    expect(body.address).toBe(WALLET);
+    expect(body.operator_token).toBe('opc_sess');
+  });
+});
+
+describe('AgentScore.pollSession()', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('GETs /v1/sessions/:id with the X-Poll-Secret header', async () => {
+    mockFetchOk({ status: 'verified', next_steps: { action: 'use_stored_operator_token' } });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const res = await client.pollSession('sess abc/1', 'ps_secret');
+    expect(res.status).toBe('verified');
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toBe(`https://api.agentscore.sh/v1/sessions/${encodeURIComponent('sess abc/1')}`);
+    expect((call[1].headers as Record<string, string>)['X-Poll-Secret']).toBe('ps_secret');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Credentials: create / list / revoke
+// ---------------------------------------------------------------------------
+
+describe('AgentScore credentials', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('createCredential posts an empty body when no options are given', async () => {
+    mockFetchOk({ operator_token: 'opc_new', label: null, ttl_days: 1 });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const res = await client.createCredential();
+    expect(res.operator_token).toBe('opc_new');
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toBe('https://api.agentscore.sh/v1/credentials');
+    expect(call[1].method).toBe('POST');
+    expect(JSON.parse(call[1].body as string)).toEqual({});
+  });
+
+  it('createCredential includes label and ttl_days when provided', async () => {
+    mockFetchOk({ operator_token: 'opc_new', label: 'bot', ttl_days: 30 });
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.createCredential({ label: 'bot', ttl_days: 30 });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.label).toBe('bot');
+    expect(body.ttl_days).toBe(30);
+  });
+
+  it('createCredential keeps ttl_days: 0 (not dropped by the undefined check)', async () => {
+    mockFetchOk({ operator_token: 'opc_new', label: null, ttl_days: 0 });
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.createCredential({ ttl_days: 0 });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body).toHaveProperty('ttl_days');
+    expect(body.ttl_days).toBe(0);
+    expect(body.label).toBeUndefined();
+  });
+
+  it('listCredentials GETs /v1/credentials', async () => {
+    mockFetchOk({ credentials: [] });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const res = await client.listCredentials();
+    expect(res).toEqual({ credentials: [] });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toBe('https://api.agentscore.sh/v1/credentials');
+  });
+
+  it('revokeCredential DELETEs /v1/credentials/:id with the id encoded', async () => {
+    mockFetchOk({ revoked: true });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const res = await client.revokeCredential('opc/weird id');
+    expect(res).toEqual({ revoked: true });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toBe(`https://api.agentscore.sh/v1/credentials/${encodeURIComponent('opc/weird id')}`);
+    expect(call[1].method).toBe('DELETE');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// associateWallet
+// ---------------------------------------------------------------------------
+
+describe('AgentScore.associateWallet()', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('posts operator_token / wallet_address / network and omits idempotency_key when none given', async () => {
+    mockFetchOk({ first_seen: true });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const res = await client.associateWallet({
+      operatorToken: 'opc_aw',
+      walletAddress: WALLET,
+      network: 'evm',
+    });
+    expect(res).toEqual({ first_seen: true });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toBe('https://api.agentscore.sh/v1/credentials/wallets');
+    expect(call[1].method).toBe('POST');
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.operator_token).toBe('opc_aw');
+    expect(body.wallet_address).toBe(WALLET);
+    expect(body.network).toBe('evm');
+    expect(body).not.toHaveProperty('idempotency_key');
+  });
+
+  it('forwards a short idempotencyKey without warning', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockFetchOk({ first_seen: false });
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.associateWallet({
+      operatorToken: 'opc_aw',
+      walletAddress: WALLET,
+      network: 'evm',
+      idempotencyKey: '0xtxhash',
+    });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.idempotency_key).toBe('0xtxhash');
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('warns but still forwards an idempotencyKey longer than 200 chars', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockFetchOk({ first_seen: false });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const longKey = 'k'.repeat(201);
+    await client.associateWallet({
+      operatorToken: 'opc_aw',
+      walletAddress: WALLET,
+      network: 'solana',
+      idempotencyKey: longKey,
+    });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.idempotency_key).toBe(longKey);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('longer than 200 chars'));
+    warn.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Request-path branch edges: non-Error rejections + missing retry-after
+// ---------------------------------------------------------------------------
+
+describe('Request path — branch edges', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('wraps a non-Error fetch rejection (thrown string) as network_error with "Unknown error"', async () => {
+    // Exercises the `err instanceof Error ? err.message : 'Unknown error'` and
+    // `err instanceof Error ? err.name : ''` else-branches in requestWithHeaders().
+    global.fetch = vi.fn().mockRejectedValueOnce('boom-not-an-error');
+    const client = new AgentScore({ apiKey: API_KEY });
+    try {
+      await client.getReputation(WALLET);
+      expect.unreachable('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(AgentScoreError);
+      const err = e as AgentScoreError;
+      expect(err.code).toBe('network_error');
+      expect(err.status).toBe(0);
+      expect(err.message).toBe('Unknown error');
+    }
+  });
+
+  it('defaults the 429 backoff to 1000ms when no retry-after header is present', async () => {
+    // First 429 has NO retry-after header → exercises the `: 1000` side of the
+    // `retryAfter ? ... : 1000` ternary. We make the retry succeed so the call resolves.
+    vi.useFakeTimers();
+    let callCount = 0;
+    global.fetch = vi.fn().mockImplementation(() => {
+      callCount += 1;
+      if (callCount === 1) {
+        return Promise.resolve({
+          ok: false,
+          status: 429,
+          headers: new Headers({}), // no retry-after
+          json: () => Promise.resolve({}),
+        } as unknown as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(REPUTATION_RESPONSE),
+      } as unknown as Response);
+    });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const promise = client.getReputation(WALLET);
+    // Flush the 1000ms default backoff timer.
+    await vi.advanceTimersByTimeAsync(1000);
+    const res = await promise;
+    expect(res.score.grade).toBe('A');
+    expect(callCount).toBe(2);
+    vi.useRealTimers();
   });
 });
