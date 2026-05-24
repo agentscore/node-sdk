@@ -160,9 +160,8 @@ export interface Signer {
 }
 
 /** Server-side wallet-signer-match verdict. Emitted on `AssessResponse.signer_match` when
- *  the request supplied `signer`. Mirrors the verdict shape commerce SDK gates
- *  produce locally; SDK consumers spread this into 403 bodies verbatim instead of
- *  re-deriving via 2 extra `/v1/assess` round trips. */
+ *  the request supplied `signer`. Consumers can spread this into 403 bodies verbatim
+ *  instead of re-deriving it via 2 extra `/v1/assess` round trips. */
 export interface SignerMatch {
   /** `pass` — claimed wallet and signer wallet resolve to the same operator (or are
    *  byte-equal). `wallet_signer_mismatch` — operators differ.
@@ -570,7 +569,11 @@ export interface AccountVerification {
   jurisdiction?: string | null;
   age_verified?: boolean;
   age_bracket?: string | null;
-  sanctions_status?: string | null;
+  /** `true` only when screened AND within the freshness window; `false` when on a
+   *  sanctions list; `null` when never screened or stale. */
+  sanctions_clear?: boolean | null;
+  /** ISO-8601 timestamp of the last sanctions screening, or `null` if never screened. */
+  sanctions_checked_at?: string | null;
   operator_type?: string | null;
 }
 

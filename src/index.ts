@@ -242,7 +242,14 @@ export class AgentScore {
         throw await buildErrorFromResponse(response);
       }
 
-      const data = (await response.json()) as T;
+      let data: T;
+      try {
+        data = (await response.json()) as T;
+      } catch {
+        // Malformed JSON on a 2xx — surface a typed error rather than letting the raw
+        // SyntaxError fall through and be reported as a network_error.
+        throw new AgentScoreError('invalid_response', 'Server returned invalid JSON on success response', response.status);
+      }
       return { data, headers: response.headers };
     } catch (err) {
       if (err instanceof AgentScoreError) throw err;
