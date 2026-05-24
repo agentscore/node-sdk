@@ -217,6 +217,21 @@ describe('AgentScore.getReputation()', () => {
       expect(err.status).toBe(500);
     }
   });
+
+  it('keeps default code + status-based message when the error block lacks code/message', async () => {
+    expect.assertions(4);
+    mockFetchError(503, { error: {} as { code: string; message: string } });
+    const client = new AgentScore({ apiKey: API_KEY });
+    try {
+      await client.getReputation(WALLET);
+    } catch (e) {
+      expect(e).toBeInstanceOf(AgentScoreError);
+      const err = e as AgentScoreError;
+      expect(err.code).toBe('unknown_error');
+      expect(err.message).toBe('Request failed with status 503');
+      expect(err.status).toBe(503);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
