@@ -40,7 +40,7 @@ export * from './types';
 
 declare const __VERSION__: string;
 
-const DEFAULT_BASE_URL = 'https://api.agentscore.sh';
+const DEFAULT_BASE_URL = 'https://api.agentscore.com';
 const DEFAULT_TIMEOUT = 10_000;
 
 export class AgentScore {
@@ -51,7 +51,7 @@ export class AgentScore {
 
   constructor(config: AgentScoreConfig) {
     if (!config.apiKey) {
-      throw new Error('AgentScore API key is required. Get one at https://agentscore.sh/sign-up');
+      throw new Error('AgentScore API key is required. Get one at https://agentscore.com/sign-up');
     }
     let base = config.baseUrl ?? DEFAULT_BASE_URL;
     while (base.endsWith('/')) base = base.slice(0, -1);

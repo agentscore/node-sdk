@@ -78,9 +78,9 @@ describe('wallet-auth hardening types', () => {
     const memory: AgentMemoryHint = {
       save_for_future_agentscore_gates: true,
       pattern_summary: 'AgentScore is a cross-merchant identity layer',
-      quickstart: 'https://docs.agentscore.sh/agent-commerce-quickstart',
-      identity_check_endpoint: 'https://api.agentscore.sh/v1/credentials',
-      list_wallets_endpoint: 'https://api.agentscore.sh/v1/credentials/wallets',
+      quickstart: 'https://docs.agentscore.com/agent-commerce-quickstart',
+      identity_check_endpoint: 'https://api.agentscore.com/v1/credentials',
+      list_wallets_endpoint: 'https://api.agentscore.com/v1/credentials/wallets',
       identity_paths: {
         wallet: 'send X-Wallet-Address when paying from a linked wallet',
         operator_token: 'send X-Operator-Token for any rail',
@@ -114,8 +114,8 @@ describe('wallet-auth hardening types', () => {
     const res: SessionCreateResponse = {
       session_id: 'sess_abc',
       poll_secret: 'poll_abc',
-      verify_url: 'https://agentscore.sh/verify?session=sess_abc',
-      poll_url: 'https://api.agentscore.sh/v1/sessions/sess_abc',
+      verify_url: 'https://agentscore.com/verify?session=sess_abc',
+      poll_url: 'https://api.agentscore.com/v1/sessions/sess_abc',
       expires_at: '2026-04-24T00:00:00Z',
       agent_memory: {
         save_for_future_agentscore_gates: true,

@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@agent-score/sdk.svg)](https://www.npmjs.com/package/@agent-score/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-TypeScript/Node.js client for the [AgentScore](https://agentscore.sh) APIs.
+TypeScript/Node.js client for the [AgentScore](https://agentscore.com) APIs.
 
 ## Install
 
@@ -140,8 +140,8 @@ await client.associateWallet({
 
 | Option      | Type     | Default                     | Description              |
 | ----------- | -------- | --------------------------- | ------------------------ |
-| `apiKey`    | `string` | ---                         | API key from [agentscore.sh](https://agentscore.sh) |
-| `baseUrl`   | `string` | `https://api.agentscore.sh` | API base URL             |
+| `apiKey`    | `string` | ---                         | API key from [agentscore.com](https://agentscore.com) |
+| `baseUrl`   | `string` | `https://api.agentscore.com` | API base URL             |
 | `timeout`   | `number` | `10000`                     | Request timeout in ms    |
 | `userAgent` | `string` | ---                         | Prepended to the default `User-Agent` as `"{userAgent} (@agent-score/sdk@{version})"`. Use to attribute API calls to your app. |
 
@@ -214,7 +214,7 @@ if (result.quota && result.quota.limit && result.quota.used) {
 
 ## Documentation
 
-- [API Reference](https://docs.agentscore.sh)
+- [API Reference](https://docs.agentscore.com)
 
 ## License
 

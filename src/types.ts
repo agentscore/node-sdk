@@ -268,7 +268,7 @@ export interface QuotaInfo {
 /** Provenance block returned when the identity input was an AIP Agent Identity Token.
  *  Surfaces which issuer attested the identity and the trust level it asserted. */
 export interface AipProvenance {
-  /** Canonical issuer URL of the AIT (e.g. `https://issuer.example`, `https://agentscore.sh`). */
+  /** Canonical issuer URL of the AIT (e.g. `https://issuer.example`, `https://agentscore.com`). */
   issuer: string;
   /** The token's `sub` — the IdP's subject identifier for the verified human. */
   subject: string;

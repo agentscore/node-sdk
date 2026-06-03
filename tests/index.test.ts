@@ -140,7 +140,7 @@ describe('AgentScore.getReputation()', () => {
     const client = new AgentScore({ apiKey: API_KEY });
     await client.getReputation(WALLET);
     expect(global.fetch).toHaveBeenCalledWith(
-      `https://api.agentscore.sh/v1/reputation/${WALLET}`,
+      `https://api.agentscore.com/v1/reputation/${WALLET}`,
       expect.objectContaining({
         headers: expect.objectContaining({ 'X-API-Key': API_KEY }),
       }),
@@ -152,7 +152,7 @@ describe('AgentScore.getReputation()', () => {
     const client = new AgentScore({ apiKey: API_KEY });
     await client.getReputation(WALLET);
     expect(global.fetch).toHaveBeenCalledWith(
-      `https://api.agentscore.sh/v1/reputation/${WALLET}`,
+      `https://api.agentscore.com/v1/reputation/${WALLET}`,
       expect.anything(),
     );
   });
@@ -255,7 +255,7 @@ describe('AgentScore.assess()', () => {
     const client = new AgentScore({ apiKey: API_KEY });
     await client.assess(WALLET);
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.agentscore.sh/v1/assess',
+      'https://api.agentscore.com/v1/assess',
       expect.objectContaining({ method: 'POST' }),
     );
   });
@@ -558,7 +558,7 @@ describe('Edge cases', () => {
     await client.getReputation(WALLET, { chain: 'ethereum' });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const url = call[0] as string;
-    expect(url).toBe(`https://api.agentscore.sh/v1/reputation/${WALLET}?chain=ethereum`);
+    expect(url).toBe(`https://api.agentscore.com/v1/reputation/${WALLET}?chain=ethereum`);
   });
 });
 
@@ -610,12 +610,12 @@ describe('Verification and compliance fields', () => {
       ...ASSESS_RESPONSE,
       decision: 'deny',
       decision_reasons: ['kyc_required'],
-      verify_url: 'https://agentscore.sh/verify/abc123',
+      verify_url: 'https://agentscore.com/verify/abc123',
     };
     mockFetchOk(response);
     const client = new AgentScore({ apiKey: API_KEY });
     const result = await client.assess(WALLET);
-    expect(result.verify_url).toBe('https://agentscore.sh/verify/abc123');
+    expect(result.verify_url).toBe('https://agentscore.com/verify/abc123');
     expect(result.decision).toBe('deny');
   });
 
@@ -690,7 +690,7 @@ describe('Integration: compliance policy deny with verify_url', () => {
         operator_type: null,
         verified_at: null,
       },
-      verify_url: 'https://agentscore.sh/verify/xyz789',
+      verify_url: 'https://agentscore.com/verify/xyz789',
     };
 
     mockFetchOk(complianceDenyResponse);
@@ -706,7 +706,7 @@ describe('Integration: compliance policy deny with verify_url', () => {
     expect(result.decision).toBe('deny');
     expect(result.decision_reasons).toContain('kyc_required');
     expect(result.decision_reasons).toContain('sanctions_flagged');
-    expect(result.verify_url).toBe('https://agentscore.sh/verify/xyz789');
+    expect(result.verify_url).toBe('https://agentscore.com/verify/xyz789');
     expect(result.operator_verification).toBeDefined();
     expect(result.operator_verification!.level).toBe('none');
 
@@ -869,10 +869,10 @@ describe('AgentScore typed errors', () => {
   it('throws TokenExpiredError on 401 token_expired with parsed body fields exposed on the instance', async () => {
     mockFetchError(401, {
       error: { code: 'token_expired', message: 'Operator token expired' },
-      verify_url: 'https://agentscore.sh/verify/abc',
+      verify_url: 'https://agentscore.com/verify/abc',
       session_id: 'sess_123',
       poll_secret: 'ps_456',
-      poll_url: 'https://api.agentscore.sh/v1/sessions/sess_123',
+      poll_url: 'https://api.agentscore.com/v1/sessions/sess_123',
       next_steps: { action: 'deliver_verify_url_and_poll' },
       agent_memory: { pattern_summary: 'remembered' },
     });
@@ -885,10 +885,10 @@ describe('AgentScore typed errors', () => {
       const err = e as TokenExpiredError;
       expect(err.code).toBe('token_expired');
       expect(err.status).toBe(401);
-      expect(err.verifyUrl).toBe('https://agentscore.sh/verify/abc');
+      expect(err.verifyUrl).toBe('https://agentscore.com/verify/abc');
       expect(err.sessionId).toBe('sess_123');
       expect(err.pollSecret).toBe('ps_456');
-      expect(err.pollUrl).toBe('https://api.agentscore.sh/v1/sessions/sess_123');
+      expect(err.pollUrl).toBe('https://api.agentscore.com/v1/sessions/sess_123');
       expect(err.nextSteps).toEqual({ action: 'deliver_verify_url_and_poll' });
     }
   });
@@ -1191,7 +1191,7 @@ describe('AgentScore.telemetrySignerMatch()', () => {
 const SESSION_CREATE_RESPONSE = {
   session_id: 'sess_abc',
   poll_secret: 'ps_xyz',
-  verify_url: 'https://agentscore.sh/verify/sess_abc',
+  verify_url: 'https://agentscore.com/verify/sess_abc',
   status: 'pending',
   next_steps: { action: 'deliver_verify_url_and_poll' },
 };
@@ -1205,7 +1205,7 @@ describe('AgentScore.createSession()', () => {
     const res = await client.createSession();
     expect(res).toMatchObject(SESSION_CREATE_RESPONSE);
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(call[0]).toBe('https://api.agentscore.sh/v1/sessions');
+    expect(call[0]).toBe('https://api.agentscore.com/v1/sessions');
     expect(call[1].method).toBe('POST');
     expect(JSON.parse(call[1].body as string)).toEqual({});
   });
@@ -1237,7 +1237,7 @@ describe('AgentScore.pollSession()', () => {
     const res = await client.pollSession('sess abc/1', 'ps_secret');
     expect(res.status).toBe('verified');
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(call[0]).toBe(`https://api.agentscore.sh/v1/sessions/${encodeURIComponent('sess abc/1')}`);
+    expect(call[0]).toBe(`https://api.agentscore.com/v1/sessions/${encodeURIComponent('sess abc/1')}`);
     expect((call[1].headers as Record<string, string>)['X-Poll-Secret']).toBe('ps_secret');
   });
 });
@@ -1255,7 +1255,7 @@ describe('AgentScore credentials', () => {
     const res = await client.createCredential();
     expect(res.operator_token).toBe('opc_new');
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(call[0]).toBe('https://api.agentscore.sh/v1/credentials');
+    expect(call[0]).toBe('https://api.agentscore.com/v1/credentials');
     expect(call[1].method).toBe('POST');
     expect(JSON.parse(call[1].body as string)).toEqual({});
   });
@@ -1287,7 +1287,7 @@ describe('AgentScore credentials', () => {
     const res = await client.listCredentials();
     expect(res).toEqual({ credentials: [] });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(call[0]).toBe('https://api.agentscore.sh/v1/credentials');
+    expect(call[0]).toBe('https://api.agentscore.com/v1/credentials');
   });
 
   it('revokeCredential DELETEs /v1/credentials/:id with the id encoded', async () => {
@@ -1296,7 +1296,7 @@ describe('AgentScore credentials', () => {
     const res = await client.revokeCredential('opc/weird id');
     expect(res).toEqual({ revoked: true });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(call[0]).toBe(`https://api.agentscore.sh/v1/credentials/${encodeURIComponent('opc/weird id')}`);
+    expect(call[0]).toBe(`https://api.agentscore.com/v1/credentials/${encodeURIComponent('opc/weird id')}`);
     expect(call[1].method).toBe('DELETE');
   });
 });
@@ -1318,7 +1318,7 @@ describe('AgentScore.associateWallet()', () => {
     });
     expect(res).toEqual({ first_seen: true });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(call[0]).toBe('https://api.agentscore.sh/v1/credentials/wallets');
+    expect(call[0]).toBe('https://api.agentscore.com/v1/credentials/wallets');
     expect(call[1].method).toBe('POST');
     const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
     expect(body.operator_token).toBe('opc_aw');
