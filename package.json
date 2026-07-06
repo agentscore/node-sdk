@@ -53,7 +53,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "@types/node": "^25.9.1",
+    "@types/node": "^26.1.0",
     "@vitest/coverage-v8": "^4.1.7",
     "dotenv": "^17.4.2",
     "eslint": "^9.39.4",
