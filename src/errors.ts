@@ -25,7 +25,7 @@ export class PaymentRequiredError extends AgentScoreError {
 }
 
 /** HTTP 401 with `error.code = 'token_expired'` — credential is no longer valid (revoked or
- *  TTL-expired; the API deliberately doesn't disclose which). The body carries an auto-minted
+ *  TTL-expired; the API does not distinguish which). The body carries an auto-minted
  *  verification session — exposed here so callers can recover without re-parsing `details`. */
 export class TokenExpiredError extends AgentScoreError {
   public readonly verifyUrl?: string;

@@ -183,7 +183,7 @@ export interface SignerMatch {
    *  Mirrors the top-level `linked_wallets` deny-guard — omitted on `deny` verdicts. */
   linked_wallets?: string[];
   /** JSON-encoded `{action, steps, user_message}` envelope for SDK denial bodies.
-   *  Authoritative copy lives server-side; SDK consumers spread this into their 403
+   *  SDK consumers spread this into their 403
    *  body without re-parsing. */
   agent_instructions?: string;
 }
@@ -199,11 +199,29 @@ export interface AssessRequest {
    *  `address` / `operator_token`. The API re-verifies the issuer signature + claims
    *  and evaluates policy against the token's attested identity. */
   aip_token?: string;
+  /** RFC 9421 proof-of-possession material accompanying `aip_token`. Required by the API on the
+   *  AIP path — without it the token is rejected (a stolen token cannot prove possession). */
+  aip_signature?: AipSignatureMaterial;
+}
+
+/** RFC 9421 HTTP Message Signature material proving possession of the AIT-bound `cnf` key.
+ *  Forwarded alongside `aip_token` so `/v1/assess` can re-verify proof-of-possession
+ *  authoritatively — the API never sees the original agent→merchant request itself. */
+export interface AipSignatureMaterial {
+  /** HTTP method of the original agent→merchant request (`@method`). */
+  method: string;
+  /** Authority/host the agent signed (`@authority`). */
+  authority: string;
+  /** Request path the agent signed (`@path`). */
+  path: string;
+  /** Raw `Signature-Input` header value the agent sent. */
+  signature_input: string;
+  /** Raw `Signature` header value the agent sent. */
+  signature: string;
 }
 
 /** Server-side OFAC SDN wallet-address verdict. Emitted on `AssessResponse.signer_sanctions`
- *  when the request supplied `signer`. AgentScore pulls the OFAC SDN Advanced XML hourly
- *  into an indexed `ofac_sanctioned_addresses` table; this is the verdict from that lookup.
+ *  when the request supplied `signer`. This is the verdict from AgentScore's OFAC SDN screen.
  *
  *  Three terminal states:
  *    - `{ status: 'clear' }`                           — address not on the OFAC SDN list
@@ -212,9 +230,8 @@ export interface AssessRequest {
  *
  *  Fail-closed posture: under `policy.require_sanctions_clear`, a hit OR an unavailable
  *  lookup flips the response `decision` to `deny` with `decision_reasons` including
- *  `sanctions_flagged` (hit) or `sanctions_check_unavailable` (lookup failure). Asymmetric
- *  cost — falsely allowing a sanctioned settle is an OFAC strict-liability violation;
- *  falsely denying a clean buyer is bad UX. */
+ *  `sanctions_flagged` (hit) or `sanctions_check_unavailable` (lookup failure). Fail-closed
+ *  because OFAC sanctions screening is strict-liability. */
 export type SignerSanctions =
   | { status: 'clear' }
   | {
@@ -268,7 +285,7 @@ export interface QuotaInfo {
 /** Provenance block returned when the identity input was an AIP Agent Identity Token.
  *  Surfaces which issuer attested the identity and the trust level it asserted. */
 export interface AipProvenance {
-  /** Canonical issuer URL of the AIT (e.g. `https://issuer.example`, `https://agentscore.sh`). */
+  /** Canonical issuer URL of the AIT (e.g. `https://issuer.example`, `https://www.agentscore.com`). */
   issuer: string;
   /** The token's `sub` — the IdP's subject identifier for the verified human. */
   subject: string;
@@ -276,6 +293,10 @@ export interface AipProvenance {
   trust_level?: 'autonomous' | 'human_present' | 'human_confirmed';
   /** Agent platform the token carried (informational unless the issuer is the platform IdP). */
   agent_provider?: string;
+  /** True when /v1/assess re-verified the RFC 9421 proof-of-possession. Always true on a success
+   *  response — the API fail-closes with an HTTP 400/401 error (not a 200 deny) when possession
+   *  can't be proven. */
+  pop_verified?: boolean;
 }
 
 export interface AssessResponse {
@@ -496,21 +517,33 @@ export interface GetReputationOptions {
   chain?: string;
 }
 
-export interface AssessOptions {
+/** Proof-of-possession pairing for the AIP identity path: `aipToken` and `aipSignature` are
+ *  only valid together. The API rejects an AIT presented without its RFC 9421 PoP material
+ *  (HTTP 400), so the pairing is enforced at the type level — `{ aipToken }` alone (or
+ *  `{ aipSignature }` alone) does not compile. */
+export type AipAssessOptions =
+  | {
+      /** AIP Agent Identity Token (a JWT) as the identity input. Serializes to the
+       *  request body's `aip_token`. The API re-verifies the issuer signature + claims and
+       *  evaluates policy against the token's attested identity. Use the
+       *  `assess(null, { aipToken, aipSignature })` overload when an AIT is the sole identity. */
+      aipToken: string;
+      /** RFC 9421 proof-of-possession material for the AIT. Serializes to the request body's
+       *  `aip_signature`. Required by the API whenever `aipToken` is set. */
+      aipSignature: AipSignatureMaterial;
+    }
+  | { aipToken?: undefined; aipSignature?: undefined };
+
+export type AssessOptions = {
   chain?: string;
   refresh?: boolean;
   policy?: DecisionPolicy;
   operatorToken?: string;
-  /** Optional AIP Agent Identity Token (a JWT) as the identity input. Serializes to the
-   *  request body's `aip_token`. The API re-verifies the issuer signature + claims and
-   *  evaluates policy against the token's attested identity. Use the `assess(null, { aipToken })`
-   *  overload when an AIT is the sole identity. */
-  aipToken?: string;
   /** Optional payment-signer wallet. Lets commerce gates collapse the legacy 2 follow-up
    *  assess calls + the wallet-sanctions check into the gate's primary assess call. The
    *  response then carries `signer_match` + `signer_sanctions` verdicts. See {@link Signer}. */
   signer?: Signer;
-}
+} & AipAssessOptions;
 
 export interface SessionCreateOptions {
   context?: string;

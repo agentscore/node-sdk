@@ -30,8 +30,8 @@ function mockFetchError(status: number, errorBody?: { error: { code: string; mes
 const SESSION_CREATE_RESPONSE = {
   session_id: 'sess_abc123',
   poll_secret: 'ps_secret456',
-  verify_url: 'https://agentscore.sh/verify/sess_abc123',
-  poll_url: 'https://api.agentscore.sh/v1/sessions/sess_abc123',
+  verify_url: 'https://www.agentscore.com/verify/sess_abc123',
+  poll_url: 'https://api.agentscore.com/v1/sessions/sess_abc123',
   expires_at: '2026-04-10T00:00:00Z',
 };
 
@@ -50,7 +50,7 @@ describe('AgentScore.createSession()', () => {
     const client = new AgentScore({ apiKey: API_KEY });
     await client.createSession();
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.agentscore.sh/v1/sessions',
+      'https://api.agentscore.com/v1/sessions',
       expect.objectContaining({ method: 'POST' }),
     );
   });
@@ -154,7 +154,7 @@ describe('AgentScore.pollSession()', () => {
     await client.pollSession('sess_abc123', 'ps_secret456');
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const url = call[0] as string;
-    expect(url).toBe('https://api.agentscore.sh/v1/sessions/sess_abc123');
+    expect(url).toBe('https://api.agentscore.com/v1/sessions/sess_abc123');
     expect(call[1].method).toBeUndefined();
   });
 
@@ -221,7 +221,7 @@ describe('AgentScore.createCredential()', () => {
     const client = new AgentScore({ apiKey: API_KEY });
     await client.createCredential();
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.agentscore.sh/v1/credentials',
+      'https://api.agentscore.com/v1/credentials',
       expect.objectContaining({ method: 'POST' }),
     );
   });
@@ -323,7 +323,7 @@ describe('AgentScore.listCredentials()', () => {
     await client.listCredentials();
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const url = call[0] as string;
-    expect(url).toBe('https://api.agentscore.sh/v1/credentials');
+    expect(url).toBe('https://api.agentscore.com/v1/credentials');
     expect(call[1].method).toBeUndefined();
   });
 
@@ -375,7 +375,7 @@ describe('AgentScore.revokeCredential()', () => {
     const client = new AgentScore({ apiKey: API_KEY });
     await client.revokeCredential('cred_abc123');
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.agentscore.sh/v1/credentials/cred_abc123',
+      'https://api.agentscore.com/v1/credentials/cred_abc123',
       expect.objectContaining({ method: 'DELETE' }),
     );
   });
