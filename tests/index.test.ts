@@ -140,7 +140,7 @@ describe('AgentScore.getReputation()', () => {
     const client = new AgentScore({ apiKey: API_KEY });
     await client.getReputation(WALLET);
     expect(global.fetch).toHaveBeenCalledWith(
-      `https://api.agentscore.sh/v1/reputation/${WALLET}`,
+      `https://api.agentscore.com/v1/reputation/${WALLET}`,
       expect.objectContaining({
         headers: expect.objectContaining({ 'X-API-Key': API_KEY }),
       }),
@@ -152,7 +152,7 @@ describe('AgentScore.getReputation()', () => {
     const client = new AgentScore({ apiKey: API_KEY });
     await client.getReputation(WALLET);
     expect(global.fetch).toHaveBeenCalledWith(
-      `https://api.agentscore.sh/v1/reputation/${WALLET}`,
+      `https://api.agentscore.com/v1/reputation/${WALLET}`,
       expect.anything(),
     );
   });
@@ -255,7 +255,7 @@ describe('AgentScore.assess()', () => {
     const client = new AgentScore({ apiKey: API_KEY });
     await client.assess(WALLET);
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.agentscore.sh/v1/assess',
+      'https://api.agentscore.com/v1/assess',
       expect.objectContaining({ method: 'POST' }),
     );
   });
@@ -558,7 +558,7 @@ describe('Edge cases', () => {
     await client.getReputation(WALLET, { chain: 'ethereum' });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const url = call[0] as string;
-    expect(url).toBe(`https://api.agentscore.sh/v1/reputation/${WALLET}?chain=ethereum`);
+    expect(url).toBe(`https://api.agentscore.com/v1/reputation/${WALLET}?chain=ethereum`);
   });
 });
 
@@ -610,12 +610,12 @@ describe('Verification and compliance fields', () => {
       ...ASSESS_RESPONSE,
       decision: 'deny',
       decision_reasons: ['kyc_required'],
-      verify_url: 'https://agentscore.sh/verify/abc123',
+      verify_url: 'https://www.agentscore.com/verify/abc123',
     };
     mockFetchOk(response);
     const client = new AgentScore({ apiKey: API_KEY });
     const result = await client.assess(WALLET);
-    expect(result.verify_url).toBe('https://agentscore.sh/verify/abc123');
+    expect(result.verify_url).toBe('https://www.agentscore.com/verify/abc123');
     expect(result.decision).toBe('deny');
   });
 
@@ -690,7 +690,7 @@ describe('Integration: compliance policy deny with verify_url', () => {
         operator_type: null,
         verified_at: null,
       },
-      verify_url: 'https://agentscore.sh/verify/xyz789',
+      verify_url: 'https://www.agentscore.com/verify/xyz789',
     };
 
     mockFetchOk(complianceDenyResponse);
@@ -706,7 +706,7 @@ describe('Integration: compliance policy deny with verify_url', () => {
     expect(result.decision).toBe('deny');
     expect(result.decision_reasons).toContain('kyc_required');
     expect(result.decision_reasons).toContain('sanctions_flagged');
-    expect(result.verify_url).toBe('https://agentscore.sh/verify/xyz789');
+    expect(result.verify_url).toBe('https://www.agentscore.com/verify/xyz789');
     expect(result.operator_verification).toBeDefined();
     expect(result.operator_verification!.level).toBe('none');
 
@@ -845,6 +845,92 @@ describe('AgentScore.assess() — operatorToken', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Identity model: AIP Agent Identity Token (aipToken + aipSignature)
+// ---------------------------------------------------------------------------
+
+const AIP_TOKEN = 'eyJhbGciOiJFZERTQSJ9.ait.payload';
+
+const AIP_SIGNATURE = {
+  method: 'POST',
+  authority: 'merchant.example.com',
+  path: '/premium/report',
+  signature_input: 'sig1=("@method" "@authority" "@path");keyid="agent-cnf-key";alg="ed25519"',
+  signature: 'sig1=:dGVzdC1zaWduYXR1cmU=:',
+};
+
+describe('AgentScore.assess() — aipToken + aipSignature', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('sends aip_token and aip_signature (all 5 PoP fields) in the request body', async () => {
+    mockFetchOk({ ...ASSESS_RESPONSE, identity_method: 'aip_token' });
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(null, { aipToken: AIP_TOKEN, aipSignature: AIP_SIGNATURE });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.aip_token).toBe(AIP_TOKEN);
+    expect(body.aip_signature).toEqual({
+      method: 'POST',
+      authority: 'merchant.example.com',
+      path: '/premium/report',
+      signature_input: 'sig1=("@method" "@authority" "@path");keyid="agent-cnf-key";alg="ed25519"',
+      signature: 'sig1=:dGVzdC1zaWduYXR1cmU=:',
+    });
+    expect(body.address).toBeUndefined();
+    expect(body.operator_token).toBeUndefined();
+  });
+
+  it('sends aip_token alongside policy and signer when combined', async () => {
+    mockFetchOk({ ...ASSESS_RESPONSE, identity_method: 'aip_token' });
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(null, {
+      aipToken: AIP_TOKEN,
+      aipSignature: AIP_SIGNATURE,
+      policy: { require_kyc: true },
+      signer: { address: '0xsigner', network: 'evm' },
+    });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body.aip_token).toBe(AIP_TOKEN);
+    expect(body.aip_signature).toEqual(AIP_SIGNATURE);
+    expect(body.policy).toEqual({ require_kyc: true });
+    expect(body.signer).toEqual({ address: '0xsigner', network: 'evm' });
+  });
+
+  it('omits aip_token and aip_signature when not provided', async () => {
+    mockFetchOk(ASSESS_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.assess(WALLET);
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect(body).not.toHaveProperty('aip_token');
+    expect(body).not.toHaveProperty('aip_signature');
+  });
+
+  it('parses the aip provenance block (incl. pop_verified) and identity_method onto the response', async () => {
+    mockFetchOk({
+      ...ASSESS_RESPONSE,
+      identity_method: 'aip_token',
+      aip: {
+        issuer: 'https://www.agentscore.com',
+        subject: 'user_2abc',
+        trust_level: 'human_present',
+        agent_provider: 'openai',
+        pop_verified: true,
+      },
+    });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const result = await client.assess(null, { aipToken: AIP_TOKEN, aipSignature: AIP_SIGNATURE });
+    expect(result.identity_method).toBe('aip_token');
+    expect(result.aip).toBeDefined();
+    expect(result.aip!.issuer).toBe('https://www.agentscore.com');
+    expect(result.aip!.subject).toBe('user_2abc');
+    expect(result.aip!.trust_level).toBe('human_present');
+    expect(result.aip!.agent_provider).toBe('openai');
+    expect(result.aip!.pop_verified).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Typed errors
 // ---------------------------------------------------------------------------
 
@@ -869,10 +955,10 @@ describe('AgentScore typed errors', () => {
   it('throws TokenExpiredError on 401 token_expired with parsed body fields exposed on the instance', async () => {
     mockFetchError(401, {
       error: { code: 'token_expired', message: 'Operator token expired' },
-      verify_url: 'https://agentscore.sh/verify/abc',
+      verify_url: 'https://www.agentscore.com/verify/abc',
       session_id: 'sess_123',
       poll_secret: 'ps_456',
-      poll_url: 'https://api.agentscore.sh/v1/sessions/sess_123',
+      poll_url: 'https://api.agentscore.com/v1/sessions/sess_123',
       next_steps: { action: 'deliver_verify_url_and_poll' },
       agent_memory: { pattern_summary: 'remembered' },
     });
@@ -885,10 +971,10 @@ describe('AgentScore typed errors', () => {
       const err = e as TokenExpiredError;
       expect(err.code).toBe('token_expired');
       expect(err.status).toBe(401);
-      expect(err.verifyUrl).toBe('https://agentscore.sh/verify/abc');
+      expect(err.verifyUrl).toBe('https://www.agentscore.com/verify/abc');
       expect(err.sessionId).toBe('sess_123');
       expect(err.pollSecret).toBe('ps_456');
-      expect(err.pollUrl).toBe('https://api.agentscore.sh/v1/sessions/sess_123');
+      expect(err.pollUrl).toBe('https://api.agentscore.com/v1/sessions/sess_123');
       expect(err.nextSteps).toEqual({ action: 'deliver_verify_url_and_poll' });
     }
   });
@@ -1191,7 +1277,7 @@ describe('AgentScore.telemetrySignerMatch()', () => {
 const SESSION_CREATE_RESPONSE = {
   session_id: 'sess_abc',
   poll_secret: 'ps_xyz',
-  verify_url: 'https://agentscore.sh/verify/sess_abc',
+  verify_url: 'https://www.agentscore.com/verify/sess_abc',
   status: 'pending',
   next_steps: { action: 'deliver_verify_url_and_poll' },
 };
@@ -1205,7 +1291,7 @@ describe('AgentScore.createSession()', () => {
     const res = await client.createSession();
     expect(res).toMatchObject(SESSION_CREATE_RESPONSE);
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(call[0]).toBe('https://api.agentscore.sh/v1/sessions');
+    expect(call[0]).toBe('https://api.agentscore.com/v1/sessions');
     expect(call[1].method).toBe('POST');
     expect(JSON.parse(call[1].body as string)).toEqual({});
   });
@@ -1237,7 +1323,7 @@ describe('AgentScore.pollSession()', () => {
     const res = await client.pollSession('sess abc/1', 'ps_secret');
     expect(res.status).toBe('verified');
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(call[0]).toBe(`https://api.agentscore.sh/v1/sessions/${encodeURIComponent('sess abc/1')}`);
+    expect(call[0]).toBe(`https://api.agentscore.com/v1/sessions/${encodeURIComponent('sess abc/1')}`);
     expect((call[1].headers as Record<string, string>)['X-Poll-Secret']).toBe('ps_secret');
   });
 });
@@ -1255,7 +1341,7 @@ describe('AgentScore credentials', () => {
     const res = await client.createCredential();
     expect(res.operator_token).toBe('opc_new');
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(call[0]).toBe('https://api.agentscore.sh/v1/credentials');
+    expect(call[0]).toBe('https://api.agentscore.com/v1/credentials');
     expect(call[1].method).toBe('POST');
     expect(JSON.parse(call[1].body as string)).toEqual({});
   });
@@ -1287,7 +1373,7 @@ describe('AgentScore credentials', () => {
     const res = await client.listCredentials();
     expect(res).toEqual({ credentials: [] });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(call[0]).toBe('https://api.agentscore.sh/v1/credentials');
+    expect(call[0]).toBe('https://api.agentscore.com/v1/credentials');
   });
 
   it('revokeCredential DELETEs /v1/credentials/:id with the id encoded', async () => {
@@ -1296,7 +1382,7 @@ describe('AgentScore credentials', () => {
     const res = await client.revokeCredential('opc/weird id');
     expect(res).toEqual({ revoked: true });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(call[0]).toBe(`https://api.agentscore.sh/v1/credentials/${encodeURIComponent('opc/weird id')}`);
+    expect(call[0]).toBe(`https://api.agentscore.com/v1/credentials/${encodeURIComponent('opc/weird id')}`);
     expect(call[1].method).toBe('DELETE');
   });
 });
@@ -1318,7 +1404,7 @@ describe('AgentScore.associateWallet()', () => {
     });
     expect(res).toEqual({ first_seen: true });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(call[0]).toBe('https://api.agentscore.sh/v1/credentials/wallets');
+    expect(call[0]).toBe('https://api.agentscore.com/v1/credentials/wallets');
     expect(call[1].method).toBe('POST');
     const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
     expect(body.operator_token).toBe('opc_aw');
@@ -1385,6 +1471,84 @@ describe('Request path — branch edges', () => {
       expect(err.status).toBe(0);
       expect(err.message).toBe('Unknown error');
     }
+  });
+
+  // Helper for the Retry-After parsing tests below: first response is a 429 carrying the
+  // given headers, second response succeeds. Returns a getter for the fetch call count.
+  function mock429ThenOk(headers: Record<string, string>): () => number {
+    let callCount = 0;
+    global.fetch = vi.fn().mockImplementation(() => {
+      callCount += 1;
+      if (callCount === 1) {
+        return Promise.resolve({
+          ok: false,
+          status: 429,
+          headers: new Headers(headers),
+          json: () => Promise.resolve({}),
+        } as unknown as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(REPUTATION_RESPONSE),
+      } as unknown as Response);
+    });
+    return () => callCount;
+  }
+
+  it('falls back to the 1s default backoff on a non-numeric Retry-After (HTTP-date)', async () => {
+    // Number('Wed, ...') is NaN — setTimeout(NaN) would retry immediately without the fix.
+    vi.useFakeTimers();
+    const calls = mock429ThenOk({ 'retry-after': 'Wed, 21 Oct 2026 07:28:00 GMT' });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const promise = client.getReputation(WALLET);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(calls()).toBe(1); // still waiting — did NOT retry immediately
+    await vi.advanceTimersByTimeAsync(1);
+    const res = await promise;
+    expect(res.score.grade).toBe('A');
+    expect(calls()).toBe(2);
+    vi.useRealTimers();
+  });
+
+  it('clamps a negative Retry-After to 0 (retries immediately, no NaN/negative timer)', async () => {
+    vi.useFakeTimers();
+    const calls = mock429ThenOk({ 'retry-after': '-5' });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const promise = client.getReputation(WALLET);
+    await vi.advanceTimersByTimeAsync(0);
+    const res = await promise;
+    expect(res.score.grade).toBe('A');
+    expect(calls()).toBe(2);
+    vi.useRealTimers();
+  });
+
+  it('clamps a huge Retry-After to the 10s ceiling', async () => {
+    vi.useFakeTimers();
+    const calls = mock429ThenOk({ 'retry-after': '86400' });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const promise = client.getReputation(WALLET);
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(calls()).toBe(1); // not retried yet
+    await vi.advanceTimersByTimeAsync(1); // 10s ceiling, not 86400s
+    const res = await promise;
+    expect(res.score.grade).toBe('A');
+    expect(calls()).toBe(2);
+    vi.useRealTimers();
+  });
+
+  it('honors a normal numeric Retry-After as seconds', async () => {
+    vi.useFakeTimers();
+    const calls = mock429ThenOk({ 'retry-after': '3' });
+    const client = new AgentScore({ apiKey: API_KEY });
+    const promise = client.getReputation(WALLET);
+    await vi.advanceTimersByTimeAsync(2_999);
+    expect(calls()).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    const res = await promise;
+    expect(res.score.grade).toBe('A');
+    expect(calls()).toBe(2);
+    vi.useRealTimers();
   });
 
   it('defaults the 429 backoff to 1000ms when no retry-after header is present', async () => {

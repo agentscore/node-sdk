@@ -10,6 +10,7 @@ import {
 import type {
   AgentScoreConfig,
   AgentScoreErrorBody,
+  AipSignatureMaterial,
   AssessOptions,
   AssessResponse,
   AssociateWalletOptions,
@@ -40,7 +41,7 @@ export * from './types';
 
 declare const __VERSION__: string;
 
-const DEFAULT_BASE_URL = 'https://api.agentscore.sh';
+const DEFAULT_BASE_URL = 'https://api.agentscore.com';
 const DEFAULT_TIMEOUT = 10_000;
 
 export class AgentScore {
@@ -51,7 +52,7 @@ export class AgentScore {
 
   constructor(config: AgentScoreConfig) {
     if (!config.apiKey) {
-      throw new Error('AgentScore API key is required. Get one at https://agentscore.sh/sign-up');
+      throw new Error('AgentScore API key is required. Get one at https://www.agentscore.com/sign-up');
     }
     let base = config.baseUrl ?? DEFAULT_BASE_URL;
     while (base.endsWith('/')) base = base.slice(0, -1);
@@ -73,7 +74,7 @@ export class AgentScore {
 
   async assess(address: string, options?: AssessOptions): Promise<AssessResponse>;
   async assess(address: null, options: AssessOptions & { operatorToken: string }): Promise<AssessResponse>;
-  async assess(address: null, options: AssessOptions & { aipToken: string }): Promise<AssessResponse>;
+  async assess(address: null, options: AssessOptions & { aipToken: string; aipSignature: AipSignatureMaterial }): Promise<AssessResponse>;
   async assess(address: string | null, options?: AssessOptions): Promise<AssessResponse> {
     const body: Record<string, unknown> = {};
     if (address) body.address = address;
@@ -82,6 +83,7 @@ export class AgentScore {
     // signature + claims server-side and evaluates policy against the attested identity
     // (alongside the existing wallet / operator_token paths).
     if (options?.aipToken) body.aip_token = options.aipToken;
+    if (options?.aipSignature) body.aip_signature = options.aipSignature;
     if (options?.chain) body.chain = options.chain;
     if (options?.refresh !== undefined) body.refresh = options.refresh;
     if (options?.policy) body.policy = options.policy;
@@ -221,9 +223,8 @@ export class AgentScore {
       });
 
       if (response.status === 429) {
-        const retryAfter = response.headers.get('retry-after');
-        const waitMs = retryAfter ? Number(retryAfter) * 1000 : 1000;
-        await new Promise((resolve) => setTimeout(resolve, Math.min(waitMs, 10_000)));
+        const waitMs = parseRetryAfterMs(response.headers.get('retry-after'));
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
 
         // Fresh controller for the retry. Reusing the original signal would let a stale
         // timeout abort the retry mid-flight (the original timer keeps running while we
@@ -290,6 +291,18 @@ function extractQuota(headers: Headers | undefined): QuotaInfo | undefined {
     used: parseQuotaNumber(used),
     reset,
   };
+}
+
+/** Parse a `Retry-After` header into a backoff in ms. Numeric values clamp to [0, 10] seconds
+ *  (a negative value from a buggy/malicious proxy must not skip the backoff; a huge value must
+ *  not stall the caller). Non-numeric (HTTP-date) or absent values fall back to 1s — `Number()`
+ *  would yield NaN and `setTimeout(NaN)` fires immediately. Parity with the python SDK's
+ *  `_retry_after_seconds`. */
+function parseRetryAfterMs(raw: string | null): number {
+  if (raw === null || raw.trim() === '') return 1000;
+  const seconds = Number(raw);
+  if (Number.isNaN(seconds)) return 1000;
+  return Math.min(Math.max(seconds, 0), 10) * 1000;
 }
 
 function parseQuotaNumber(raw: string | null): number | null {
