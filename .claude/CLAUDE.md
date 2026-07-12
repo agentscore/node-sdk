@@ -40,6 +40,7 @@ Single-package TypeScript library published to npm.
 - **ESLint 9** — linting. `bun run lint`.
 - **tsup** — builds CJS + ESM. `bun run build`.
 - **Vitest** — tests. `bun run test`.
+- **knip** — dead-code check. `bun run knip`.
 - **Lefthook** — git hooks. Pre-commit: lint. Pre-push: typecheck.
 
 ## Key Commands

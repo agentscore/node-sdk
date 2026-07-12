@@ -4,17 +4,24 @@ updates:
     directory: "/"
     cooldown:
       default-days: 1
+    commit-message:
+      prefix: "chore(deps)"
     labels: ["dependencies", "javascript"]
     schedule:
       interval: "weekly"
       day: "monday"
       time: "06:00"
       timezone: "America/New_York"
+    groups:
+      minor-patch:
+        update-types: ["minor", "patch"]
     ignore:
+      # eslint 10 defaults churn lint org-wide; upgrade is a deliberate cross-repo pass (2026-07-08)
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@eslint/js"
         update-types: ["version-update:semver-major"]
+      # TS majors are a deliberate org-wide pass, not a routine bump
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
 
@@ -22,10 +29,14 @@ updates:
     directory: "/"
     cooldown:
       default-days: 1
+    commit-message:
+      prefix: "chore(deps)"
     labels: ["dependencies", "ci"]
     schedule:
       interval: "weekly"
       day: "monday"
       time: "06:00"
       timezone: "America/New_York"
-
+    groups:
+      actions:
+        patterns: ["*"]
