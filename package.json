@@ -22,7 +22,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "prepare": "lefthook install",
-    "prepublishOnly": "bun run build"
+    "prepublishOnly": "bun run build",
+    "knip": "knip"
   },
   "keywords": [
     "agentscore",
@@ -59,6 +60,7 @@
     "eslint": "^9.39.5",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-unused-imports": "^4.4.1",
+    "knip": "^6.26.0",
     "lefthook": "^2.1.10",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
