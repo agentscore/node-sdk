@@ -9,3 +9,5 @@ pre-push:
   commands:
     typecheck:
       run: bunx tsc --noEmit
+    knip:
+      run: bun run knip
