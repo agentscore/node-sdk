@@ -633,6 +633,10 @@ export interface CredentialItem {
   expires_at: string | null;
   last_used_at: string | null;
   created_at: string;
+  /** `true` when a live refresh token can still mint a replacement for this
+   *  credential. An expired credential is listed only while this holds, since
+   *  revoking it is what stops the renewal. */
+  refreshable?: boolean;
 }
 
 export interface AccountVerification {

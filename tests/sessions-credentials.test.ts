@@ -293,6 +293,7 @@ const CREDENTIAL_LIST_RESPONSE = {
       expires_at: '2027-04-09T00:00:00Z',
       last_used_at: '2026-04-08T12:00:00Z',
       created_at: '2026-04-01T00:00:00Z',
+      refreshable: true,
     },
     {
       id: 'cred_def456',
@@ -315,6 +316,9 @@ describe('AgentScore.listCredentials()', () => {
     expect(result.credentials).toHaveLength(2);
     expect(result.credentials[0].id).toBe('cred_abc123');
     expect(result.credentials[1].last_used_at).toBeNull();
+    expect(result.credentials[0].refreshable).toBe(true);
+    // Optional on the wire: an older API build omits the key entirely.
+    expect(result.credentials[1].refreshable).toBeUndefined();
   });
 
   it('sends GET request to /v1/credentials', async () => {
