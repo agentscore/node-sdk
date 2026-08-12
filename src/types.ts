@@ -310,6 +310,19 @@ export interface AssessResponse {
    *  Returned regardless of identity_method so agents can enumerate all wallets they could
    *  sign with to satisfy a wallet-auth claim. Capped at 100 entries. */
   linked_wallets?: string[];
+  /** Stable pairwise handle (`oph_...`) for the ACCOUNT behind a presented operator token.
+   *
+   *  This is the identity durable merchant state should key on, because it survives the
+   *  token rotating, expiring or being revoked: an `opc_` lives 24h and rotates silently
+   *  off a 90-day refresh, so anything keyed on the token instance is stranded daily.
+   *  Pairwise per consuming account, so the same buyer presents an unrelated handle to
+   *  every merchant and handles never correlate across them.
+   *
+   *  Carries no compliance meaning: a registration-only (`sign_in`) credential resolves the
+   *  same as a KYC-backed one, so read the decision fields for policy. Present only on the
+   *  operator-token path, and returned on denials too, since it is identity rather than a
+   *  verdict. */
+  operator_handle?: string;
   verify_url?: string;
   policy_result?: PolicyResult | null;
   explanation?: PolicyExplanation[];
