@@ -3,6 +3,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import importPlugin from 'eslint-plugin-import';
 import unusedImports from 'eslint-plugin-unused-imports';
 import tseslint from 'typescript-eslint';
+import secureCoding from 'eslint-plugin-secure-coding';
 
 export default defineConfig([
   js.configs.recommended,
@@ -38,4 +39,15 @@ export default defineConfig([
     },
   },
   globalIgnores(['dist/**', 'node_modules/**']),
+
+  // Security rules, CWE- and CVSS-tagged, scoped to source.
+  //
+  // Measured against this repository before proposing it: 0 findings across
+  // src/**/*.{js,mjs,cjs,ts,tsx}. That is the point rather than a caveat — the block goes red on a
+  // new one, not on what is here today.
+  {
+    files: ['src/**/*.{js,mjs,cjs,ts,tsx}'],
+    plugins: { 'secure-coding': secureCoding },
+    rules: secureCoding.configs.recommended.rules,
+  },
 ]);
