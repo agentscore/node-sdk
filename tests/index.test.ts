@@ -1296,7 +1296,7 @@ describe('AgentScore.createSession()', () => {
     expect(JSON.parse(call[1].body as string)).toEqual({});
   });
 
-  it('includes context, product_name, address, and operator_token when provided', async () => {
+  it('includes context, product_name, address, operator_token, and kind when provided', async () => {
     mockFetchOk(SESSION_CREATE_RESPONSE);
     const client = new AgentScore({ apiKey: API_KEY });
     await client.createSession({
@@ -1304,6 +1304,7 @@ describe('AgentScore.createSession()', () => {
       product_name: 'Widget',
       address: WALLET,
       operator_token: 'opc_sess',
+      kind: 'sign_in',
     });
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
@@ -1311,6 +1312,16 @@ describe('AgentScore.createSession()', () => {
     expect(body.product_name).toBe('Widget');
     expect(body.address).toBe(WALLET);
     expect(body.operator_token).toBe('opc_sess');
+    expect(body.kind).toBe('sign_in');
+  });
+
+  it('omits kind from the body when not provided, so the API applies its default', async () => {
+    mockFetchOk(SESSION_CREATE_RESPONSE);
+    const client = new AgentScore({ apiKey: API_KEY });
+    await client.createSession({ context: 'checkout' });
+    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(call[1].body as string) as Record<string, unknown>;
+    expect('kind' in body).toBe(false);
   });
 });
 

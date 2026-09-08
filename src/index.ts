@@ -104,6 +104,7 @@ export class AgentScore {
     if (options?.product_name) body.product_name = options.product_name;
     if (options?.address) body.address = options.address;
     if (options?.operator_token) body.operator_token = options.operator_token;
+    if (options?.kind) body.kind = options.kind;
 
     return this.request<SessionCreateResponse>('/v1/sessions', {
       method: 'POST',

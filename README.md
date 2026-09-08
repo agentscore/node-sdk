@@ -77,6 +77,7 @@ if (status.status === "verified") {
 // for an existing operator credential.
 await client.createSession({ address: "0x..." });
 await client.createSession({ operator_token: "opc_..." }); // KYC refresh
+await client.createSession({ kind: "sign_in" }); // registration-only: account sign-in, no identity documents
 ```
 
 ### Wallet resolution
