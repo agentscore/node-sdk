@@ -565,6 +565,11 @@ export interface SessionCreateOptions {
   address?: string;
   /** Pre-associate the session with an existing operator credential — e.g. refresh KYC for an `opc_...`. */
   operator_token?: string;
+  /** Session kind. `'kyc'` (the default) runs identity verification; `'sign_in'` is
+   *  registration-only (the buyer signs in with an AgentScore account, no identity documents)
+   *  and mints a `sign_in`-scoped credential, for merchants that key durable state on the
+   *  account without any compliance policy. */
+  kind?: 'kyc' | 'sign_in';
 }
 
 export interface SessionCreateNextSteps {
@@ -581,6 +586,8 @@ export interface SessionCreateResponse {
   verify_url: string;
   poll_url: string;
   expires_at: string;
+  /** The kind the session was minted with; absent on older API responses. */
+  kind?: 'kyc' | 'sign_in';
   /** Structured `next_steps.action: 'deliver_verify_url_and_poll'` with step-by-step
    *  instructions for consuming the session. */
   next_steps?: SessionCreateNextSteps;
