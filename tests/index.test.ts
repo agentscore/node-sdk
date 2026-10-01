@@ -42,15 +42,6 @@ function mockFetchOkWithHeaders(body: unknown, headers: Record<string, string>):
   } as unknown as Response);
 }
 
-const REPUTATION_RESPONSE = {
-  subject: { chains: ['base'], address: WALLET },
-  score: { value: 85, grade: 'A', status: 'scored' },
-  chains: [{ chain: 'base', score: { value: 85, grade: 'A' }, classification: { entity_type: 'agent' }, identity: {}, activity: {}, evidence_summary: { metadata_kind: null, has_a2a_agent_card: false, website_url: null, website_reachable: false, website_mentions_mcp: false, website_mentions_x402: false, github_url: null, github_stars: null } }],
-  data_semantics: 'v1',
-  caveats: [],
-  updated_at: '2024-01-01T00:00:00Z',
-};
-
 const ASSESS_RESPONSE = {
   subject: { chains: ['base'], address: WALLET },
   score: { value: 85, grade: 'A', status: 'scored' },
@@ -91,28 +82,28 @@ describe('AgentScore constructor', () => {
   });
 
   it('strips trailing slashes from baseUrl', async () => {
-    mockFetchOk(REPUTATION_RESPONSE);
+    mockFetchOk(ASSESS_RESPONSE);
     const client = new AgentScore({ apiKey: API_KEY, baseUrl: 'https://api.example.com///' });
-    await client.getReputation(WALLET);
+    await client.assess(WALLET);
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.example.com/v1/reputation/0xabc123',
+      'https://api.example.com/v1/assess',
       expect.anything(),
     );
   });
 
   it('sends User-Agent header with package version', async () => {
-    mockFetchOk(REPUTATION_RESPONSE);
+    mockFetchOk(ASSESS_RESPONSE);
     const client = new AgentScore({ apiKey: API_KEY });
-    await client.getReputation(WALLET);
+    await client.assess(WALLET);
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const headers = call[1].headers as Record<string, string>;
     expect(headers['User-Agent']).toBe(`@agent-score/sdk@${__VERSION__}`);
   });
 
   it('prepends custom userAgent to the default when configured', async () => {
-    mockFetchOk(REPUTATION_RESPONSE);
+    mockFetchOk(ASSESS_RESPONSE);
     const client = new AgentScore({ apiKey: API_KEY, userAgent: 'my-app/1.2.3' });
-    await client.getReputation(WALLET);
+    await client.assess(WALLET);
     const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const headers = call[1].headers as Record<string, string>;
     expect(headers['User-Agent']).toBe(`my-app/1.2.3 (@agent-score/sdk@${__VERSION__})`);
@@ -120,57 +111,12 @@ describe('AgentScore constructor', () => {
 });
 
 // ---------------------------------------------------------------------------
-// getReputation
+// request errors
 // ---------------------------------------------------------------------------
 
-describe('AgentScore.getReputation()', () => {
+describe('AgentScore request errors', () => {
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  it('returns reputation data on success', async () => {
-    mockFetchOk(REPUTATION_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    const result = await client.getReputation(WALLET);
-    expect(result).toMatchObject(REPUTATION_RESPONSE);
-  });
-
-  it('sends the correct GET request URL', async () => {
-    mockFetchOk(REPUTATION_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    await client.getReputation(WALLET);
-    expect(global.fetch).toHaveBeenCalledWith(
-      `https://api.agentscore.com/v1/reputation/${WALLET}`,
-      expect.objectContaining({
-        headers: expect.objectContaining({ 'X-API-Key': API_KEY }),
-      }),
-    );
-  });
-
-  it('does not send chain param when not provided', async () => {
-    mockFetchOk(REPUTATION_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    await client.getReputation(WALLET);
-    expect(global.fetch).toHaveBeenCalledWith(
-      `https://api.agentscore.com/v1/reputation/${WALLET}`,
-      expect.anything(),
-    );
-  });
-
-  it('sends chain query param when provided', async () => {
-    mockFetchOk(REPUTATION_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    await client.getReputation(WALLET, { chain: 'base' });
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('chain=base'),
-      expect.anything(),
-    );
-  });
-
-  it('throws AgentScoreError on non-OK response with structured error body', async () => {
-    mockFetchError(404, { error: { code: 'not_found', message: 'Wallet not found' } });
-    const client = new AgentScore({ apiKey: API_KEY });
-    await expect(client.getReputation(WALLET)).rejects.toBeInstanceOf(AgentScoreError);
   });
 
   it('throws invalid_response when a 2xx body is not valid JSON', async () => {
@@ -182,7 +128,7 @@ describe('AgentScore.getReputation()', () => {
     } as unknown as Response);
     const client = new AgentScore({ apiKey: API_KEY });
     try {
-      await client.getReputation(WALLET);
+      await client.assess(WALLET);
     } catch (e) {
       expect(e).toBeInstanceOf(AgentScoreError);
       expect((e as AgentScoreError).code).toBe('invalid_response');
@@ -194,7 +140,7 @@ describe('AgentScore.getReputation()', () => {
     mockFetchError(404, { error: { code: 'not_found', message: 'Wallet not found' } });
     const client = new AgentScore({ apiKey: API_KEY });
     try {
-      await client.getReputation(WALLET);
+      await client.assess(WALLET);
     } catch (e) {
       expect(e).toBeInstanceOf(AgentScoreError);
       const err = e as AgentScoreError;
@@ -209,7 +155,7 @@ describe('AgentScore.getReputation()', () => {
     mockFetchError(500);
     const client = new AgentScore({ apiKey: API_KEY });
     try {
-      await client.getReputation(WALLET);
+      await client.assess(WALLET);
     } catch (e) {
       expect(e).toBeInstanceOf(AgentScoreError);
       const err = e as AgentScoreError;
@@ -223,7 +169,7 @@ describe('AgentScore.getReputation()', () => {
     mockFetchError(503, { error: {} as { code: string; message: string } });
     const client = new AgentScore({ apiKey: API_KEY });
     try {
-      await client.getReputation(WALLET);
+      await client.assess(WALLET);
     } catch (e) {
       expect(e).toBeInstanceOf(AgentScoreError);
       const err = e as AgentScoreError;
@@ -437,7 +383,7 @@ describe('Timeout and network errors', () => {
     const client = new AgentScore({ apiKey: API_KEY, timeout: 10 });
 
     try {
-      await client.getReputation(WALLET);
+      await client.assess(WALLET);
       expect.unreachable('should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(AgentScoreError);
@@ -453,7 +399,7 @@ describe('Timeout and network errors', () => {
     const client = new AgentScore({ apiKey: API_KEY });
 
     try {
-      await client.getReputation(WALLET);
+      await client.assess(WALLET);
       expect.unreachable('should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(AgentScoreError);
@@ -472,17 +418,6 @@ describe('Timeout and network errors', () => {
 describe('Edge cases', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('getReputation encodes special characters in address', async () => {
-    mockFetchOk(REPUTATION_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    const weirdAddress = '0xabc/def?foo=bar&baz=qux#hash';
-    await client.getReputation(weirdAddress);
-    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    const url = call[0] as string;
-    expect(url).toContain(encodeURIComponent(weirdAddress));
-    expect(url).not.toContain('0xabc/def');
-  });
-
   it('falls back to unknown_error when response.json() throws', async () => {
     expect.assertions(3);
     global.fetch = vi.fn().mockResolvedValueOnce({
@@ -493,7 +428,7 @@ describe('Edge cases', () => {
 
     const client = new AgentScore({ apiKey: API_KEY });
     try {
-      await client.getReputation(WALLET);
+      await client.assess(WALLET);
     } catch (e) {
       expect(e).toBeInstanceOf(AgentScoreError);
       const err = e as AgentScoreError;
@@ -518,13 +453,13 @@ describe('Edge cases', () => {
     expect(body.policy).toEqual({ require_kyc: true, require_sanctions_clear: true });
   });
 
-  it('two concurrent getReputation calls both resolve correctly', async () => {
-    const response2 = { ...REPUTATION_RESPONSE, subject: { chains: ['ethereum'], address: '0xdef456' } };
+  it('two concurrent assess calls both resolve correctly', async () => {
+    const response2 = { ...ASSESS_RESPONSE, subject: { chains: ['ethereum'], address: '0xdef456' } };
     global.fetch = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: vi.fn().mockResolvedValueOnce(REPUTATION_RESPONSE),
+        json: vi.fn().mockResolvedValueOnce(ASSESS_RESPONSE),
       } as unknown as Response)
       .mockResolvedValueOnce({
         ok: true,
@@ -534,10 +469,10 @@ describe('Edge cases', () => {
 
     const client = new AgentScore({ apiKey: API_KEY });
     const [r1, r2] = await Promise.all([
-      client.getReputation(WALLET),
-      client.getReputation('0xdef456'),
+      client.assess(WALLET),
+      client.assess('0xdef456'),
     ]);
-    expect(r1).toMatchObject(REPUTATION_RESPONSE);
+    expect(r1).toMatchObject(ASSESS_RESPONSE);
     expect(r2).toMatchObject(response2);
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
@@ -551,15 +486,6 @@ describe('Edge cases', () => {
     expect(body).toHaveProperty('refresh');
     expect(body.refresh).toBe(false);
   });
-
-  it('getReputation appends chain to query string', async () => {
-    mockFetchOk(REPUTATION_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    await client.getReputation(WALLET, { chain: 'ethereum' });
-    const call = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    const url = call[0] as string;
-    expect(url).toBe(`https://api.agentscore.com/v1/reputation/${WALLET}?chain=ethereum`);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -568,24 +494,6 @@ describe('Edge cases', () => {
 
 describe('Verification and compliance fields', () => {
   afterEach(() => vi.restoreAllMocks());
-
-  it('getReputation returns verification_level when present', async () => {
-    const response = {
-      ...REPUTATION_RESPONSE,
-      verification_level: 'kyc_verified' as const,
-    };
-    mockFetchOk(response);
-    const client = new AgentScore({ apiKey: API_KEY });
-    const result = await client.getReputation(WALLET);
-    expect(result.verification_level).toBe('kyc_verified');
-  });
-
-  it('getReputation omits verification_level when not present', async () => {
-    mockFetchOk(REPUTATION_RESPONSE);
-    const client = new AgentScore({ apiKey: API_KEY });
-    const result = await client.getReputation(WALLET);
-    expect(result.verification_level).toBeUndefined();
-  });
 
   it('assess response includes operator_verification when present', async () => {
     const response = {
@@ -782,12 +690,12 @@ describe('AgentScore.assess() — operatorToken', () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: vi.fn().mockResolvedValueOnce(REPUTATION_RESPONSE),
+        json: vi.fn().mockResolvedValueOnce(ASSESS_RESPONSE),
       } as unknown as Response);
 
     const client = new AgentScore({ apiKey: API_KEY });
-    const result = await client.getReputation(WALLET);
-    expect(result.score.grade).toBe('A');
+    const result = await client.assess(WALLET);
+    expect(result.decision).toBe('allow');
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
@@ -806,7 +714,7 @@ describe('AgentScore.assess() — operatorToken', () => {
       } as unknown as Response);
 
     const client = new AgentScore({ apiKey: API_KEY });
-    await expect(client.getReputation(WALLET)).rejects.toThrow(AgentScoreError);
+    await expect(client.assess(WALLET)).rejects.toThrow(AgentScoreError);
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
@@ -833,7 +741,7 @@ describe('AgentScore.assess() — operatorToken', () => {
     const client = new AgentScore({ apiKey: API_KEY, timeout: 10 });
 
     try {
-      await client.getReputation(WALLET);
+      await client.assess(WALLET);
       expect.unreachable('should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(AgentScoreError);
@@ -1473,7 +1381,7 @@ describe('Request path — branch edges', () => {
     global.fetch = vi.fn().mockRejectedValueOnce('boom-not-an-error');
     const client = new AgentScore({ apiKey: API_KEY });
     try {
-      await client.getReputation(WALLET);
+      await client.assess(WALLET);
       expect.unreachable('should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(AgentScoreError);
@@ -1501,7 +1409,7 @@ describe('Request path — branch edges', () => {
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve(REPUTATION_RESPONSE),
+        json: () => Promise.resolve(ASSESS_RESPONSE),
       } as unknown as Response);
     });
     return () => callCount;
@@ -1512,12 +1420,12 @@ describe('Request path — branch edges', () => {
     vi.useFakeTimers();
     const calls = mock429ThenOk({ 'retry-after': 'Wed, 21 Oct 2026 07:28:00 GMT' });
     const client = new AgentScore({ apiKey: API_KEY });
-    const promise = client.getReputation(WALLET);
+    const promise = client.assess(WALLET);
     await vi.advanceTimersByTimeAsync(999);
     expect(calls()).toBe(1); // still waiting — did NOT retry immediately
     await vi.advanceTimersByTimeAsync(1);
     const res = await promise;
-    expect(res.score.grade).toBe('A');
+    expect(res.decision).toBe('allow');
     expect(calls()).toBe(2);
     vi.useRealTimers();
   });
@@ -1526,10 +1434,10 @@ describe('Request path — branch edges', () => {
     vi.useFakeTimers();
     const calls = mock429ThenOk({ 'retry-after': '-5' });
     const client = new AgentScore({ apiKey: API_KEY });
-    const promise = client.getReputation(WALLET);
+    const promise = client.assess(WALLET);
     await vi.advanceTimersByTimeAsync(0);
     const res = await promise;
-    expect(res.score.grade).toBe('A');
+    expect(res.decision).toBe('allow');
     expect(calls()).toBe(2);
     vi.useRealTimers();
   });
@@ -1538,12 +1446,12 @@ describe('Request path — branch edges', () => {
     vi.useFakeTimers();
     const calls = mock429ThenOk({ 'retry-after': '86400' });
     const client = new AgentScore({ apiKey: API_KEY });
-    const promise = client.getReputation(WALLET);
+    const promise = client.assess(WALLET);
     await vi.advanceTimersByTimeAsync(9_999);
     expect(calls()).toBe(1); // not retried yet
     await vi.advanceTimersByTimeAsync(1); // 10s ceiling, not 86400s
     const res = await promise;
-    expect(res.score.grade).toBe('A');
+    expect(res.decision).toBe('allow');
     expect(calls()).toBe(2);
     vi.useRealTimers();
   });
@@ -1552,12 +1460,12 @@ describe('Request path — branch edges', () => {
     vi.useFakeTimers();
     const calls = mock429ThenOk({ 'retry-after': '3' });
     const client = new AgentScore({ apiKey: API_KEY });
-    const promise = client.getReputation(WALLET);
+    const promise = client.assess(WALLET);
     await vi.advanceTimersByTimeAsync(2_999);
     expect(calls()).toBe(1);
     await vi.advanceTimersByTimeAsync(1);
     const res = await promise;
-    expect(res.score.grade).toBe('A');
+    expect(res.decision).toBe('allow');
     expect(calls()).toBe(2);
     vi.useRealTimers();
   });
@@ -1580,15 +1488,15 @@ describe('Request path — branch edges', () => {
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve(REPUTATION_RESPONSE),
+        json: () => Promise.resolve(ASSESS_RESPONSE),
       } as unknown as Response);
     });
     const client = new AgentScore({ apiKey: API_KEY });
-    const promise = client.getReputation(WALLET);
+    const promise = client.assess(WALLET);
     // Flush the 1000ms default backoff timer.
     await vi.advanceTimersByTimeAsync(1000);
     const res = await promise;
-    expect(res.score.grade).toBe('A');
+    expect(res.decision).toBe('allow');
     expect(callCount).toBe(2);
     vi.useRealTimers();
   });

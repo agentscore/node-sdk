@@ -1,6 +1,6 @@
 {
   "name": "@agent-score/sdk",
-  "version": "2.7.12",
+  "version": "3.0.0",
   "description": "TypeScript client for the AgentScore APIs",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -31,7 +31,6 @@
     "erc-8004",
     "agent",
     "trust",
-    "reputation",
     "wallet",
     "blockchain",
     "ai-agent",

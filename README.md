@@ -20,14 +20,6 @@ import { AgentScore } from "@agent-score/sdk";
 
 const client = new AgentScore({ apiKey: "as_live_..." });
 
-// Look up cached reputation (free)
-const rep = await client.getReputation("0x1234...");
-console.log(rep.score.value, rep.score.grade);
-
-// Filter to a specific chain
-const baseRep = await client.getReputation("0x1234...", { chain: "base" });
-console.log(baseRep.agents); // only Base agents
-
 // Identity gate with policy (paid)
 const gated = await client.assess("0x1234...", {
   policy: {
@@ -41,10 +33,6 @@ if (gated.decision === "deny") {
   console.log(gated.decision_reasons); // ["kyc_required"]
   console.log(gated.verify_url);       // URL for operator verification
 }
-
-// Check verification level on reputation
-const verified = await client.getReputation("0x1234...");
-console.log(verified.verification_level); // "none" | "wallet_claimed" | "kyc_verified"
 ```
 
 ### Credential-Based Identity
@@ -152,7 +140,7 @@ await client.associateWallet({
 import { AgentScore, AgentScoreError } from "@agent-score/sdk";
 
 try {
-  await client.getReputation("0xinvalid");
+  await client.assess("0xinvalid");
 } catch (err) {
   if (err instanceof AgentScoreError) {
     console.error(err.code, err.message, err.status);
