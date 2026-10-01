@@ -70,7 +70,7 @@ await client.createSession({ kind: "sign_in" }); // registration-only: account s
 
 ### Wallet resolution
 
-`assess()` responses include `resolved_operator` and `linked_wallets[]`, all same-operator sibling wallets (claimed via SIWE or captured via prior `associateWallet`). The list may mix EVM addresses (`0x...` lowercased) and Solana addresses (base58, case-preserved) for cross-chain operators; merchants doing wallet-signer-match checks should accept a payment signed by any address in the list, regardless of chain. The `address` parameter on `assess()` and `getReputation()` accepts either format; the network is auto-detected from the address shape.
+`assess()` responses include `resolved_operator` and `linked_wallets[]`, all same-operator sibling wallets (claimed via SIWE or captured via prior `associateWallet`). The list may mix EVM addresses (`0x...` lowercased) and Solana addresses (base58, case-preserved) for cross-chain operators; merchants doing wallet-signer-match checks should accept a payment signed by any address in the list, regardless of chain. The `address` parameter on `assess()` accepts either format; the network is auto-detected from the address shape.
 
 ### Server-side signer-match + sanctions screening
 
