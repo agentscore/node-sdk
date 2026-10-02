@@ -20,14 +20,6 @@ import { AgentScore } from "@agent-score/sdk";
 
 const client = new AgentScore({ apiKey: "as_live_..." });
 
-// Look up cached reputation (free)
-const rep = await client.getReputation("0x1234...");
-console.log(rep.score.value, rep.score.grade);
-
-// Filter to a specific chain
-const baseRep = await client.getReputation("0x1234...", { chain: "base" });
-console.log(baseRep.agents); // only Base agents
-
 // Identity gate with policy (paid)
 const gated = await client.assess("0x1234...", {
   policy: {
@@ -42,9 +34,8 @@ if (gated.decision === "deny") {
   console.log(gated.verify_url);       // URL for operator verification
 }
 
-// Check verification level on reputation
-const verified = await client.getReputation("0x1234...");
-console.log(verified.verification_level); // "none" | "wallet_claimed" | "kyc_verified"
+// Verification level of the operator behind the wallet
+console.log(gated.operator_verification?.level); // "none" | "kyc_verified"
 ```
 
 ### Credential-Based Identity
@@ -82,7 +73,7 @@ await client.createSession({ kind: "sign_in" }); // registration-only: account s
 
 ### Wallet resolution
 
-`assess()` responses include `resolved_operator` and `linked_wallets[]`, all same-operator sibling wallets (claimed via SIWE or captured via prior `associateWallet`). The list may mix EVM addresses (`0x...` lowercased) and Solana addresses (base58, case-preserved) for cross-chain operators; merchants doing wallet-signer-match checks should accept a payment signed by any address in the list, regardless of chain. The `address` parameter on `assess()` and `getReputation()` accepts either format; the network is auto-detected from the address shape.
+`assess()` responses include `resolved_operator` and `linked_wallets[]`, all same-operator sibling wallets (claimed via SIWE or captured via prior `associateWallet`). The list may mix EVM addresses (`0x...` lowercased) and Solana addresses (base58, case-preserved) for cross-chain operators; merchants doing wallet-signer-match checks should accept a payment signed by any address in the list, regardless of chain. The `address` parameter on `assess()` accepts either format; the network is auto-detected from the address shape.
 
 ### Server-side signer-match + sanctions screening
 
@@ -152,7 +143,7 @@ await client.associateWallet({
 import { AgentScore, AgentScoreError } from "@agent-score/sdk";
 
 try {
-  await client.getReputation("0xinvalid");
+  await client.assess("0xinvalid");
 } catch (err) {
   if (err instanceof AgentScoreError) {
     console.error(err.code, err.message, err.status);
