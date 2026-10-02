@@ -19,9 +19,7 @@ import type {
   CredentialCreateResponse,
   CredentialListResponse,
   CredentialRevokeResponse,
-  GetReputationOptions,
   QuotaInfo,
-  ReputationResponse,
   SessionCreateOptions,
   SessionCreateResponse,
   SessionPollResponse,
@@ -61,15 +59,6 @@ export class AgentScore {
     this.timeout = config.timeout ?? DEFAULT_TIMEOUT;
     const defaultUa = `@agent-score/sdk@${__VERSION__}`;
     this.userAgent = config.userAgent ? `${config.userAgent} (${defaultUa})` : defaultUa;
-  }
-
-  async getReputation(address: string, options?: GetReputationOptions): Promise<ReputationResponse> {
-    const params = new URLSearchParams();
-    if (options?.chain) params.set('chain', options.chain);
-    const qs = params.toString();
-    return this.request<ReputationResponse>(
-      `/v1/reputation/${encodeURIComponent(address)}${qs ? `?${qs}` : ''}`,
-    );
   }
 
   async assess(address: string, options?: AssessOptions): Promise<AssessResponse>;
