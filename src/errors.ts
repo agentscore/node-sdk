@@ -1,7 +1,7 @@
 export class AgentScoreError extends Error {
   public readonly code: string;
   public readonly status: number;
-  // Response-body fields beyond `error.{code,message}` — e.g. verify_url, linked_wallets,
+  // Response-body fields beyond `error.{code,message}`: e.g. verify_url, linked_wallets,
   // claimed_operator, actual_signer, reasons. Consumers branch on these for granular recovery.
   public readonly details: Record<string, unknown>;
 
@@ -15,7 +15,7 @@ export class AgentScoreError extends Error {
   }
 }
 
-/** HTTP 402 — the endpoint is not enabled for this account. */
+/** HTTP 402: the endpoint is not enabled for this account. */
 export class PaymentRequiredError extends AgentScoreError {
   constructor(message: string, details: Record<string, unknown> = {}) {
     super('payment_required', message, 402, details);
@@ -24,9 +24,9 @@ export class PaymentRequiredError extends AgentScoreError {
   }
 }
 
-/** HTTP 401 with `error.code = 'token_expired'` — credential is no longer valid (revoked or
+/** HTTP 401 with `error.code = 'token_expired'`: credential is no longer valid (revoked or
  *  TTL-expired; the API does not distinguish which). The body carries an auto-minted
- *  verification session — exposed here so callers can recover without re-parsing `details`. */
+ *  verification session: exposed here so callers can recover without re-parsing `details`. */
 export class TokenExpiredError extends AgentScoreError {
   public readonly verifyUrl?: string;
   public readonly sessionId?: string;
@@ -48,7 +48,7 @@ export class TokenExpiredError extends AgentScoreError {
   }
 }
 
-/** HTTP 401 with `error.code = 'invalid_credential'` — the operator_token doesn't match any
+/** HTTP 401 with `error.code = 'invalid_credential'`: the operator_token doesn't match any
  *  credential. Permanent: no auto-session is issued. Caller should switch tokens or restart. */
 export class InvalidCredentialError extends AgentScoreError {
   constructor(message: string, details: Record<string, unknown> = {}) {
@@ -58,7 +58,7 @@ export class InvalidCredentialError extends AgentScoreError {
   }
 }
 
-/** HTTP 429 with `error.code = 'quota_exceeded'` — account-level cap reached. Don't retry;
+/** HTTP 429 with `error.code = 'quota_exceeded'`: account-level cap reached. Don't retry;
  *  the cap won't lift through retry alone. Distinct from per-second `RateLimitedError`. */
 export class QuotaExceededError extends AgentScoreError {
   constructor(message: string, details: Record<string, unknown> = {}) {
@@ -68,7 +68,7 @@ export class QuotaExceededError extends AgentScoreError {
   }
 }
 
-/** HTTP 429 with `error.code = 'rate_limited'` — per-second sliding-window limit hit. Retry
+/** HTTP 429 with `error.code = 'rate_limited'`: per-second sliding-window limit hit. Retry
  *  after the interval indicated by the `Retry-After` header (typically ≤1s). */
 export class RateLimitedError extends AgentScoreError {
   constructor(message: string, details: Record<string, unknown> = {}) {

@@ -646,7 +646,7 @@ describe('Integration: compliance policy deny with verify_url', () => {
 // Identity model: operatorToken in assess
 // ---------------------------------------------------------------------------
 
-describe('AgentScore.assess() — operatorToken', () => {
+describe('AgentScore.assess(): operatorToken', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('sends operator_token when operatorToken option provided without address', async () => {
@@ -782,7 +782,7 @@ const AIP_SIGNATURE = {
   signature: 'sig1=:dGVzdC1zaWduYXR1cmU=:',
 };
 
-describe('AgentScore.assess() — aipToken + aipSignature', () => {
+describe('AgentScore.assess(): aipToken + aipSignature', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('sends aip_token and aip_signature (all 5 PoP fields) in the request body', async () => {
@@ -970,7 +970,7 @@ describe('AgentScore typed errors', () => {
 // Quota header capture
 // ---------------------------------------------------------------------------
 
-describe('AgentScore.assess() — quota capture', () => {
+describe('AgentScore.assess(): quota capture', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('attaches quota field to AssessResponse when X-Quota-* headers are present', async () => {
@@ -1003,7 +1003,7 @@ describe('AgentScore.assess() — quota capture', () => {
   });
 
   it('falls back gracefully when headers are absent on the mock response', async () => {
-    // mockFetchOk produces a Response with no `headers` field at all — extractQuota
+    // mockFetchOk produces a Response with no `headers` field at all: extractQuota
     // must defend against that without crashing.
     mockFetchOk(ASSESS_RESPONSE);
     const client = new AgentScore({ apiKey: API_KEY });
@@ -1011,10 +1011,10 @@ describe('AgentScore.assess() — quota capture', () => {
     expect(res.quota).toBeUndefined();
   });
 
-  it('returns null for malformed numeric headers (empty / decimal / non-integer) — parity with python-sdk', async () => {
+  it('returns null for malformed numeric headers (empty / decimal / non-integer): parity with python-sdk', async () => {
     mockFetchOkWithHeaders(ASSESS_RESPONSE, {
-      'x-quota-limit': '',           // empty — Number('') would be 0 without strict check
-      'x-quota-used': '1.5',         // decimal — Number('1.5') is finite but not an integer
+      'x-quota-limit': '',           // empty: Number('') would be 0 without strict check
+      'x-quota-used': '1.5',         // decimal: Number('1.5') is finite but not an integer
       'x-quota-reset': '2026-06-01T00:00:00Z',
     });
     const client = new AgentScore({ apiKey: API_KEY });
@@ -1064,10 +1064,10 @@ describe('AgentScore.assess() — quota capture', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Generic 4xx fallthrough — codes the SDK doesn't have a typed subclass for
+// Generic 4xx fallthrough: codes the SDK doesn't have a typed subclass for
 // ---------------------------------------------------------------------------
 
-describe('AgentScore — generic 4xx fallthrough', () => {
+describe('AgentScore: generic 4xx fallthrough', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('400 invalid_request falls through to generic AgentScoreError (not a typed subclass)', async () => {
@@ -1108,10 +1108,10 @@ describe('AgentScore — generic 4xx fallthrough', () => {
 });
 
 // ---------------------------------------------------------------------------
-// TokenExpiredError — body-field edge cases
+// TokenExpiredError: body-field edge cases
 // ---------------------------------------------------------------------------
 
-describe('TokenExpiredError — body-field edge cases', () => {
+describe('TokenExpiredError: body-field edge cases', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('all parsed-body fields stay undefined when API returns 401 token_expired with no body extras', async () => {
@@ -1146,7 +1146,7 @@ describe('TokenExpiredError — body-field edge cases', () => {
     } catch (e) {
       expect(e).toBeInstanceOf(TokenExpiredError);
       const err = e as TokenExpiredError;
-      // Strings only — wrong types ignored, instance fields stay undefined.
+      // Strings only: wrong types ignored, instance fields stay undefined.
       expect(err.verifyUrl).toBeUndefined();
       expect(err.sessionId).toBeUndefined();
       // The original body still flows through `details` so callers can inspect raw values.
@@ -1388,7 +1388,7 @@ describe('AgentScore.associateWallet()', () => {
 // Request-path branch edges: non-Error rejections + missing retry-after
 // ---------------------------------------------------------------------------
 
-describe('Request path — branch edges', () => {
+describe('Request path: branch edges', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('wraps a non-Error fetch rejection (thrown string) as network_error with "Unknown error"', async () => {
@@ -1432,13 +1432,13 @@ describe('Request path — branch edges', () => {
   }
 
   it('falls back to the 1s default backoff on a non-numeric Retry-After (HTTP-date)', async () => {
-    // Number('Wed, ...') is NaN — setTimeout(NaN) would retry immediately without the fix.
+    // Number('Wed, ...') is NaN: setTimeout(NaN) would retry immediately without the fix.
     vi.useFakeTimers();
     const calls = mock429ThenOk({ 'retry-after': 'Wed, 21 Oct 2026 07:28:00 GMT' });
     const client = new AgentScore({ apiKey: API_KEY });
     const promise = client.listCredentials();
     await vi.advanceTimersByTimeAsync(999);
-    expect(calls()).toBe(1); // still waiting — did NOT retry immediately
+    expect(calls()).toBe(1); // still waiting: did NOT retry immediately
     await vi.advanceTimersByTimeAsync(1);
     const res = await promise;
     expect(res.credentials).toEqual([]);

@@ -29,7 +29,7 @@ export interface DecisionPolicy {
  *  wallet) AND the wallet-sanctions check into the gate's primary assess call. */
 export interface Signer {
   /** Recovered payment-signer wallet. `null` indicates the rail carries no wallet
-   *  signature (Stripe SPT, card) — produces `signer_match.kind = "wallet_auth_requires_wallet_signing"`. */
+   *  signature (Stripe SPT, card): produces `signer_match.kind = "wallet_auth_requires_wallet_signing"`. */
   address: string | null;
   /** Key-derivation family of the signer wallet. */
   network: 'evm' | 'solana';
@@ -39,24 +39,24 @@ export interface Signer {
  *  the request supplied `signer`. Consumers can spread this into 403 bodies verbatim
  *  instead of re-deriving it via 2 extra `/v1/assess` round trips. */
 export interface SignerMatch {
-  /** `pass` — claimed wallet and signer wallet resolve to the same operator (or are
-   *  byte-equal). `wallet_signer_mismatch` — operators differ.
-   *  `wallet_auth_requires_wallet_signing` — request supplied `address: null` (rail has
+  /** `pass`: claimed wallet and signer wallet resolve to the same operator (or are
+   *  byte-equal). `wallet_signer_mismatch`: operators differ.
+   *  `wallet_auth_requires_wallet_signing`: request supplied `address: null` (rail has
    *  no wallet signer); agent should switch to operator_token auth. */
   kind: 'pass' | 'wallet_signer_mismatch' | 'wallet_auth_requires_wallet_signing';
   /** Operator the claimed wallet resolves to. `null` if unlinked. */
   claimed_operator?: string | null;
   /** Operator the signer wallet resolves to. `null` if unlinked. */
   signer_operator?: string | null;
-  /** Echoed only on `wallet_auth_requires_wallet_signing` — the claimed wallet from the
+  /** Echoed only on `wallet_auth_requires_wallet_signing`: the claimed wallet from the
    *  request. Helps agents construct the recovery message. */
   claimed_wallet?: string;
-  /** Echoed on `wallet_signer_mismatch` — the claimed wallet, normalized. */
+  /** Echoed on `wallet_signer_mismatch`: the claimed wallet, normalized. */
   expected_signer?: string;
-  /** Echoed on `wallet_signer_mismatch` — the signer wallet, normalized. */
+  /** Echoed on `wallet_signer_mismatch`: the signer wallet, normalized. */
   actual_signer?: string;
   /** Same-operator linked wallets the agent could re-sign from to satisfy the claim.
-   *  Mirrors the top-level `linked_wallets` deny-guard — omitted on `deny` verdicts. */
+   *  Mirrors the top-level `linked_wallets` deny-guard: omitted on `deny` verdicts. */
   linked_wallets?: string[];
   /** JSON-encoded `{action, steps, user_message}` envelope for SDK denial bodies.
    *  SDK consumers spread this into their 403
@@ -76,13 +76,13 @@ export interface AssessRequest {
    *  and evaluates policy against the token's attested identity. */
   aip_token?: string;
   /** RFC 9421 proof-of-possession material accompanying `aip_token`. Required by the API on the
-   *  AIP path — without it the token is rejected (a stolen token cannot prove possession). */
+   *  AIP path: without it the token is rejected (a stolen token cannot prove possession). */
   aip_signature?: AipSignatureMaterial;
 }
 
 /** RFC 9421 HTTP Message Signature material proving possession of the AIT-bound `cnf` key.
  *  Forwarded alongside `aip_token` so `/v1/assess` can re-verify proof-of-possession
- *  authoritatively — the API never sees the original agent→merchant request itself. */
+ *  authoritatively: the API never sees the original agent→merchant request itself. */
 export interface AipSignatureMaterial {
   /** HTTP method of the original agent→merchant request (`@method`). */
   method: string;
@@ -100,9 +100,9 @@ export interface AipSignatureMaterial {
  *  when the request supplied `signer`. This is the verdict from AgentScore's OFAC SDN screen.
  *
  *  Three terminal states:
- *    - `{ status: 'clear' }`                           — address not on the OFAC SDN list
- *    - `{ sanctioned: true, ofac_label, sdn_uid, ... }` — hit; gate must fail-closed
- *    - `{ status: 'unavailable' }`                     — lookup itself failed (DB error); fail-closed
+ *    - `{ status: 'clear' }`                          : address not on the OFAC SDN list
+ *    - `{ sanctioned: true, ofac_label, sdn_uid, ... }`: hit; gate must fail-closed
+ *    - `{ status: 'unavailable' }`                    : lookup itself failed (DB error); fail-closed
  *
  *  Fail-closed posture: under `policy.require_sanctions_clear`, a hit OR an unavailable
  *  lookup flips the response `decision` to `deny` with `decision_reasons` including
@@ -149,11 +149,11 @@ export interface PolicyExplanation {
  *  the success path. Fields are `null` when the API didn't include the header (Enterprise
  *  / unlimited tiers, or when the API is configured without a per-account quota). */
 export interface QuotaInfo {
-  /** `X-Quota-Limit` — total quota for the current period. */
+  /** `X-Quota-Limit`: total quota for the current period. */
   limit: number | null;
-  /** `X-Quota-Used` — current usage within the period. */
+  /** `X-Quota-Used`: current usage within the period. */
   used: number | null;
-  /** `X-Quota-Reset` — ISO-8601 timestamp when the period resets, or `'never'` for lifetime
+  /** `X-Quota-Reset`: ISO-8601 timestamp when the period resets, or `'never'` for lifetime
    *  caps. The API emits the literal string `'never'` for tiers without a reset. */
   reset: string | null;
 }
@@ -163,14 +163,14 @@ export interface QuotaInfo {
 export interface AipProvenance {
   /** Canonical issuer URL of the AIT (e.g. `https://issuer.example`, `https://www.agentscore.com`). */
   issuer: string;
-  /** The token's `sub` — the IdP's subject identifier for the verified human. */
+  /** The token's `sub`: the IdP's subject identifier for the verified human. */
   subject: string;
   /** Degree of human involvement the IdP asserted, when present. */
   trust_level?: 'autonomous' | 'human_present' | 'human_confirmed';
   /** Agent platform the token carried (informational unless the issuer is the platform IdP). */
   agent_provider?: string;
   /** True when /v1/assess re-verified the RFC 9421 proof-of-possession. Always true on a success
-   *  response — the API fail-closes with an HTTP 400/401 error (not a 200 deny) when possession
+   *  response: the API fail-closes with an HTTP 400/401 error (not a 200 deny) when possession
    *  can't be proven. */
   pop_verified?: boolean;
 }
@@ -237,7 +237,7 @@ export interface AgentScoreErrorBody {
  *     different operator (or isn't linked to any operator).
  *   - `wallet_auth_requires_wallet_signing`: X-Wallet-Address claimed with a payment rail that
  *     has no wallet signer (SPT, card). Agent should switch to X-Operator-Token.
- *   - `token_expired`: operator token is no longer valid (revoked or past its TTL —
+ *   - `token_expired`: operator token is no longer valid (revoked or past its TTL;
  *     the two cases share this code deliberately so the API doesn't leak which one).
  *     The 401 body carries an auto-minted session (`verify_url`, `session_id`, `poll_secret`)
  *     so the agent can recover without an API key: share `verify_url` with the user, poll
@@ -254,13 +254,13 @@ export type DenialCode =
   | 'wallet_not_trusted'
   | 'api_error'
   | 'payment_required'
-  // Merchant-emitted convenience codes — not emitted by the AgentScore API itself,
+  // Merchant-emitted convenience codes: not emitted by the AgentScore API itself,
   // but they may appear in 4xx bodies that pass through the SDK from merchants whose
   // gate `onDenied` hook wraps AgentScore denials into business-domain codes.
   | 'operator_verification_required'
   | 'compliance_denied'
   | 'compliance_error'
-  // Decision-reason code surfaced in error.code by some merchants — kept for back-compat
+  // Decision-reason code surfaced in error.code by some merchants: kept for back-compat
   // with merchants that flatten policy reasons into the error envelope.
   | 'kyc_required';
 
@@ -288,7 +288,7 @@ export type NextStepsAction =
   // Non-signing rail (Stripe SPT, card): X-Wallet-Address has no signature to verify.
   // Drop the wallet header and use X-Operator-Token.
   | 'switch_to_operator_token'
-  // Session creation success — deliver verify_url to the user and poll poll_url until
+  // Session creation success: deliver verify_url to the user and poll poll_url until
   // operator_token issues. Emitted on POST /v1/sessions.
   | 'deliver_verify_url_and_poll'
   // Session poll states.
@@ -325,10 +325,10 @@ export interface WalletSignerMismatchBody {
   linked_wallets: string[];
   /** JSON-encoded `{action: 'resign_or_switch_to_operator_token', steps, user_message}`.
    *  Present when the merchant uses the gate's default denial marshaller. Merchants that
-   *  override with their own `next_steps` may emit that instead — parse whichever is present. */
+   *  override with their own `next_steps` may emit that instead: parse whichever is present. */
   agent_instructions?: string;
   /** Structured action guidance. Present when the merchant overrides the gate default with
-   *  a custom `next_steps`. `action` may be any `NextStepsAction` — typically
+   *  a custom `next_steps`. `action` may be any `NextStepsAction`: typically
    *  `resign_or_switch_to_operator_token` (gate default) or
    *  `regenerate_payment_from_linked_wallet` (a merchant-emitted alternative). */
   next_steps?: WalletSignerMismatchNextSteps;
@@ -404,7 +404,7 @@ export interface AgentMemoryHint {
 
 /** Proof-of-possession pairing for the AIP identity path: `aipToken` and `aipSignature` are
  *  only valid together. The API rejects an AIT presented without its RFC 9421 PoP material
- *  (HTTP 400), so the pairing is enforced at the type level — `{ aipToken }` alone (or
+ *  (HTTP 400), so the pairing is enforced at the type level: `{ aipToken }` alone (or
  *  `{ aipSignature }` alone) does not compile. */
 export type AipAssessOptions =
   | {
@@ -435,7 +435,7 @@ export interface SessionCreateOptions {
   product_name?: string;
   /** Pre-associate the session with a known wallet (EVM `0x...` or Solana base58). */
   address?: string;
-  /** Pre-associate the session with an existing operator credential — e.g. refresh KYC for an `opc_...`. */
+  /** Pre-associate the session with an existing operator credential: e.g. refresh KYC for an `opc_...`. */
   operator_token?: string;
   /** Session kind. `'kyc'` (the default) runs identity verification; `'sign_in'` is
    *  registration-only (the buyer signs in with an AgentScore account, no identity documents)
@@ -547,7 +547,7 @@ export interface AccountVerification {
 
 export interface CredentialListResponse {
   credentials: CredentialItem[];
-  /** Account-level KYC facts. Conditionally emitted by the API — only present when the
+  /** Account-level KYC facts. Conditionally emitted by the API: only present when the
    *  account has an associated `account_verifications` row. Absent for accounts that
    *  have minted credentials but never started KYC. */
   account_verification?: AccountVerification;
@@ -565,13 +565,13 @@ export type Network = 'evm' | 'solana';
 export interface AssociateWalletOptions {
   /** Operator credential (opc_...) that the agent authenticated with on the gated endpoint. */
   operatorToken: string;
-  /** The signer wallet recovered from the payment payload — EVM `from` from EIP-3009 for x402,
+  /** The signer wallet recovered from the payment payload: EVM `from` from EIP-3009 for x402,
    *  the `did:pkh` address for Tempo MPP, or a Solana base58 pubkey. */
   walletAddress: string;
-  /** Key-derivation family — see {@link Network}. */
+  /** Key-derivation family: see {@link Network}. */
   network: Network;
   /** Optional stable key for the logical payment (e.g., Stripe PI id, x402 tx hash). When the
-   *  same key is seen again for the same (credential, wallet, network), the server no-ops —
+   *  same key is seen again for the same (credential, wallet, network), the server no-ops:
    *  `transaction_count` isn't inflated by agent retries. */
   idempotencyKey?: string;
 }
