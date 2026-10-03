@@ -138,7 +138,7 @@ export class AgentScore {
    * Report that a wallet paid under an operator credential. Merchants observing agent
    * payments call this passively to build a cross-merchant credential↔wallet profile.
    *
-   * Fire-and-forget friendly — the returned `first_seen` boolean is informational only.
+   * Fire-and-forget friendly: the returned `first_seen` boolean is informational only.
    */
   async associateWallet(options: AssociateWalletOptions): Promise<AssociateWalletResponse> {
     const body: Record<string, unknown> = {
@@ -227,7 +227,7 @@ export class AgentScore {
             const data = (await retry.json()) as T;
             return { data, headers: retry.headers };
           }
-          // 429 still after retry — discriminate quota vs rate.
+          // 429 still after retry: discriminate quota vs rate.
           throw await buildErrorFromResponse(retry);
         } finally {
           clearTimeout(retryTimer);
@@ -242,7 +242,7 @@ export class AgentScore {
       try {
         data = (await response.json()) as T;
       } catch {
-        // Malformed JSON on a 2xx — surface a typed error rather than letting the raw
+        // Malformed JSON on a 2xx: surface a typed error rather than letting the raw
         // SyntaxError fall through and be reported as a network_error.
         throw new AgentScoreError('invalid_response', 'Server returned invalid JSON on success response', response.status);
       }
@@ -269,7 +269,7 @@ export class AgentScore {
  *  fields fall back to `null` if the header is malformed; reset stays as a string ('never'
  *  or ISO-8601 timestamp). */
 function extractQuota(headers: Headers | undefined): QuotaInfo | undefined {
-  // Test mocks may stub Response without a real Headers object — defend against it
+  // Test mocks may stub Response without a real Headers object: defend against it
   // rather than blowing up the assess() return path on bad mocks.
   if (!headers || typeof headers.get !== 'function') return undefined;
   const limit = headers.get('x-quota-limit');
@@ -285,7 +285,7 @@ function extractQuota(headers: Headers | undefined): QuotaInfo | undefined {
 
 /** Parse a `Retry-After` header into a backoff in ms. Numeric values clamp to [0, 10] seconds
  *  (a negative value from a buggy/malicious proxy must not skip the backoff; a huge value must
- *  not stall the caller). Non-numeric (HTTP-date) or absent values fall back to 1s — `Number()`
+ *  not stall the caller). Non-numeric (HTTP-date) or absent values fall back to 1s: `Number()`
  *  would yield NaN and `setTimeout(NaN)` fires immediately. Parity with the python SDK's
  *  `_retry_after_seconds`. */
 function parseRetryAfterMs(raw: string | null): number {
@@ -297,7 +297,7 @@ function parseRetryAfterMs(raw: string | null): number {
 
 function parseQuotaNumber(raw: string | null): number | null {
   if (raw === null) return null;
-  // Strict integer-only — `Number('')` would silently return 0 and `parseInt('1.5', 10)`
+  // Strict integer-only: `Number('')` would silently return 0 and `parseInt('1.5', 10)`
   // would truncate to 1; both are wrong for malformed headers. Use a regex on trimmed
   // input so empty / decimal / scientific / alpha all return null. This matches the
   // behavior of Python's int() (which trims whitespace and rejects non-integer strings).
@@ -327,7 +327,7 @@ async function buildErrorFromResponse(response: Response): Promise<AgentScoreErr
     const { error: _omit, ...rest } = body;
     details = rest;
   } catch {
-    // Body wasn't JSON or didn't have the expected shape — keep defaults.
+    // Body wasn't JSON or didn't have the expected shape: keep defaults.
   }
 
   if (response.status === 402) return new PaymentRequiredError(message, details);
