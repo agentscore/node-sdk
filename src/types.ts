@@ -67,6 +67,7 @@ export interface SignerMatch {
 export interface AssessRequest {
   address: string;
   chain?: string;
+  /** @deprecated The API ignores this field; every assess is evaluated live. */
   refresh?: boolean;
   policy?: DecisionPolicy;
   /** Optional server-side signer verdicts (wallet-binding + OFAC SDN). See {@link Signer}. */
@@ -421,6 +422,7 @@ export type AipAssessOptions =
 
 export type AssessOptions = {
   chain?: string;
+  /** @deprecated The API ignores this field; every assess is evaluated live. */
   refresh?: boolean;
   policy?: DecisionPolicy;
   operatorToken?: string;
@@ -433,9 +435,9 @@ export type AssessOptions = {
 export interface SessionCreateOptions {
   context?: string;
   product_name?: string;
-  /** Pre-associate the session with a known wallet (EVM `0x...` or Solana base58). */
+  /** @deprecated The API ignores this field; a session is not pre-associated with a wallet. */
   address?: string;
-  /** Pre-associate the session with an existing operator credential: e.g. refresh KYC for an `opc_...`. */
+  /** @deprecated The API ignores this field; a session is not pre-associated with a credential. */
   operator_token?: string;
   /** Session kind. `'kyc'` (the default) runs identity verification; `'sign_in'` is
    *  registration-only (the buyer signs in with an AgentScore account, no identity documents)

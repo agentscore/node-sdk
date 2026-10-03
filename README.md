@@ -64,11 +64,8 @@ if (status.status === "verified") {
   console.log(status.operator_token); // "opc_...", use for future requests
 }
 
-// Optional pre-association: attach the session to a known wallet or refresh KYC
-// for an existing operator credential.
-await client.createSession({ address: "0x..." });
-await client.createSession({ operator_token: "opc_..." }); // KYC refresh
-await client.createSession({ kind: "sign_in" }); // registration-only: account sign-in, no identity documents
+// Registration-only session: the buyer signs in with an AgentScore account, no identity documents.
+await client.createSession({ kind: "sign_in" });
 ```
 
 ### Wallet resolution
