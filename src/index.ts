@@ -10,7 +10,6 @@ import {
 import type {
   AgentScoreConfig,
   AgentScoreErrorBody,
-  AipSignatureMaterial,
   AssessOptions,
   AssessResponse,
   AssociateWalletOptions,
@@ -63,16 +62,10 @@ export class AgentScore {
 
   async assess(address: string, options?: AssessOptions): Promise<AssessResponse>;
   async assess(address: null, options: AssessOptions & { operatorToken: string }): Promise<AssessResponse>;
-  async assess(address: null, options: AssessOptions & { aipToken: string; aipSignature: AipSignatureMaterial }): Promise<AssessResponse>;
   async assess(address: string | null, options?: AssessOptions): Promise<AssessResponse> {
     const body: Record<string, unknown> = {};
     if (address) body.address = address;
     if (options?.operatorToken) body.operator_token = options.operatorToken;
-    // AIP Agent Identity Token as the identity input. The API re-verifies the IdP
-    // signature + claims server-side and evaluates policy against the attested identity
-    // (alongside the existing wallet / operator_token paths).
-    if (options?.aipToken) body.aip_token = options.aipToken;
-    if (options?.aipSignature) body.aip_signature = options.aipSignature;
     if (options?.chain) body.chain = options.chain;
     if (options?.refresh !== undefined) body.refresh = options.refresh;
     if (options?.policy) body.policy = options.policy;
