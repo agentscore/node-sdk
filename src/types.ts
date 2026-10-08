@@ -72,29 +72,6 @@ export interface AssessRequest {
   policy?: DecisionPolicy;
   /** Optional server-side signer verdicts (wallet-binding + OFAC SDN). See {@link Signer}. */
   signer?: Signer;
-  /** Optional AIP Agent Identity Token (a JWT) as the identity input, in place of
-   *  `address` / `operator_token`. The API re-verifies the issuer signature + claims
-   *  and evaluates policy against the token's attested identity. */
-  aip_token?: string;
-  /** RFC 9421 proof-of-possession material accompanying `aip_token`. Required by the API on the
-   *  AIP path: without it the token is rejected (a stolen token cannot prove possession). */
-  aip_signature?: AipSignatureMaterial;
-}
-
-/** RFC 9421 HTTP Message Signature material proving possession of the AIT-bound `cnf` key.
- *  Forwarded alongside `aip_token` so `/v1/assess` can re-verify proof-of-possession
- *  authoritatively: the API never sees the original agent→merchant request itself. */
-export interface AipSignatureMaterial {
-  /** HTTP method of the original agent→merchant request (`@method`). */
-  method: string;
-  /** Authority/host the agent signed (`@authority`). */
-  authority: string;
-  /** Request path the agent signed (`@path`). */
-  path: string;
-  /** Raw `Signature-Input` header value the agent sent. */
-  signature_input: string;
-  /** Raw `Signature` header value the agent sent. */
-  signature: string;
 }
 
 /** Server-side OFAC SDN wallet-address verdict. Emitted on `AssessResponse.signer_sanctions`
@@ -159,27 +136,10 @@ export interface QuotaInfo {
   reset: string | null;
 }
 
-/** Provenance block returned when the identity input was an AIP Agent Identity Token.
- *  Surfaces which issuer attested the identity and the trust level it asserted. */
-export interface AipProvenance {
-  /** Canonical issuer URL of the AIT (e.g. `https://issuer.example`, `https://www.agentscore.com`). */
-  issuer: string;
-  /** The token's `sub`: the IdP's subject identifier for the verified human. */
-  subject: string;
-  /** Degree of human involvement the IdP asserted, when present. */
-  trust_level?: 'autonomous' | 'human_present' | 'human_confirmed';
-  /** Agent platform the token carried (informational unless the issuer is the platform IdP). */
-  agent_provider?: string;
-  /** True when /v1/assess re-verified the RFC 9421 proof-of-possession. Always true on a success
-   *  response: the API fail-closes with an HTTP 400/401 error (not a 200 deny) when possession
-   *  can't be proven. */
-  pop_verified?: boolean;
-}
-
 export interface AssessResponse {
   decision: string | null;
   decision_reasons: string[];
-  identity_method: 'wallet' | 'operator_token' | 'aip_token';
+  identity_method: 'wallet' | 'operator_token';
   operator_verification?: OperatorVerification;
   resolved_operator?: string | null;
   /** Wallets linked to the same operator as the resolved identity. Populated on allow
@@ -209,8 +169,6 @@ export interface AssessResponse {
   /** Server-side OFAC SDN wallet-address verdict, returned only when the request supplied
    *  `signer`. Empty otherwise. See {@link SignerSanctions}. */
   signer_sanctions?: SignerSanctions;
-  /** Issuer provenance, returned only when `identity_method === 'aip_token'`. */
-  aip?: AipProvenance;
   /** Quota state for this account, captured from response headers. Use it to monitor
    *  approach-to-cap proactively (e.g. warn at 80%, alert at 95%) before hitting a 429. */
   quota?: QuotaInfo;
@@ -373,10 +331,6 @@ export interface WalletAuthRequiresSigningBody {
 export interface AgentMemoryIdentityPaths {
   wallet: string;
   operator_token: string;
-  /** Present only when the merchant accepts AIP Agent Identity Tokens. Tells an agent holding
-   *  an AIT from a trusted issuer to present it via an `Agent-Identity` header + RFC 9421
-   *  signature instead of bootstrapping a fresh AgentScore credential. */
-  agent_identity?: string;
 }
 
 /**
@@ -395,30 +349,10 @@ export interface AgentMemoryHint {
   identity_check_endpoint: string;
   list_wallets_endpoint?: string;
   identity_paths: AgentMemoryIdentityPaths;
-  /** Issuers whose AIP Agent Identity Tokens the merchant accepts. Present only when the
-   *  merchant opted into AIP; pairs with `identity_paths.agent_identity`. */
-  aip_trusted_issuers?: string[];
   bootstrap: string;
   do_not_persist_in_memory: string[];
   persist_in_credential_store: string[];
 }
-
-/** Proof-of-possession pairing for the AIP identity path: `aipToken` and `aipSignature` are
- *  only valid together. The API rejects an AIT presented without its RFC 9421 PoP material
- *  (HTTP 400), so the pairing is enforced at the type level: `{ aipToken }` alone (or
- *  `{ aipSignature }` alone) does not compile. */
-export type AipAssessOptions =
-  | {
-      /** AIP Agent Identity Token (a JWT) as the identity input. Serializes to the
-       *  request body's `aip_token`. The API re-verifies the issuer signature + claims and
-       *  evaluates policy against the token's attested identity. Use the
-       *  `assess(null, { aipToken, aipSignature })` overload when an AIT is the sole identity. */
-      aipToken: string;
-      /** RFC 9421 proof-of-possession material for the AIT. Serializes to the request body's
-       *  `aip_signature`. Required by the API whenever `aipToken` is set. */
-      aipSignature: AipSignatureMaterial;
-    }
-  | { aipToken?: undefined; aipSignature?: undefined };
 
 export type AssessOptions = {
   chain?: string;
@@ -430,7 +364,7 @@ export type AssessOptions = {
    *  assess calls + the wallet-sanctions check into the gate's primary assess call. The
    *  response then carries `signer_match` + `signer_sanctions` verdicts. See {@link Signer}. */
   signer?: Signer;
-} & AipAssessOptions;
+};
 
 export interface SessionCreateOptions {
   context?: string;
