@@ -36,7 +36,7 @@ Single-package TypeScript library published to npm.
 ## Tooling
 
 - **Bun**: package manager. Use `bun install`, `bun run <script>`.
-- **ESLint 9**: linting. `bun run lint`.
+- **ESLint 10**: linting. `bun run lint`.
 - **tsup**: builds CJS + ESM. `bun run build`.
 - **Vitest**: tests. `bun run test`.
 - **knip**: dead-code check. `bun run knip`.
