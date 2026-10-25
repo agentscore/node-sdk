@@ -40,7 +40,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/agentscore/node-sdk"
+    "url": "git+https://github.com/agentscore/node-sdk.git"
   },
   "homepage": "https://www.agentscore.com",
   "bugs": {
